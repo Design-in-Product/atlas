@@ -224,10 +224,10 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
       <div id="speed-controls">
         <label>Speed:</label>
         <select id="speed-select">
-          <option value="0.5">0.5x</option>
-          <option value="1" selected>1x</option>
-          <option value="2">2x</option>
-          <option value="3">3x</option>
+          <option value="0.25">½x</option>
+          <option value="0.5" selected>1x</option>
+          <option value="1">2x</option>
+          <option value="1.5">3x</option>
         </select>
       </div>
       <div id="date-display">500 BCE</div>
@@ -2912,7 +2912,7 @@ let currentLabels = [];
 let labelsVisible = true;
 let currentKeyframeIndex = 0;
 let isPlaying = false;
-let playSpeed = 1;
+let playSpeed = 0.5;
 let animationId = null;
 let currentYear = -500;
 let targetOpacity = 0.5;
