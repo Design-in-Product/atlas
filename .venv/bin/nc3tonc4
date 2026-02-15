@@ -1,0 +1,6 @@
+#!/Users/xian/Development/atlas/.venv/bin/python3.12
+import sys
+from netCDF4.utils import nc3tonc4
+if __name__ == '__main__':
+    sys.argv[0] = sys.argv[0].removesuffix('.exe')
+    sys.exit(nc3tonc4())

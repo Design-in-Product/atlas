@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dynamic Atlas: Historical Map Viewer</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; color: #e0e0e0; overflow: hidden; height: 100vh; }
+
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+#header {
+  background: #16213e;
+  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #0f3460;
+  flex-shrink: 0;
+}
+#header h1 { font-size: 18px; font-weight: 500; color: #e0e0e0; letter-spacing: 1px; }
+#header .subtitle { font-size: 12px; color: #888; }
+
+#main { display: flex; flex: 1; min-height: 0; }
+
+#map { flex: 1; background: #0a0a1a; }
+
+#sidebar {
+  width: 260px;
+  background: #16213e;
+  border-left: 1px solid #0f3460;
+  overflow-y: auto;
+  flex-shrink: 0;
+  padding: 16px;
+}
+
+#sidebar h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #aaa; margin-bottom: 12px; }
+
+.layer-group { margin-bottom: 16px; }
+.layer-group label { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; margin-bottom: 6px; }
+.layer-group input[type="checkbox"] { accent-color: #e94560; }
+.layer-group input[type="range"] { width: 100%; accent-color: #e94560; height: 4px; }
+.layer-group .range-label { font-size: 11px; color: #666; display: flex; justify-content: space-between; }
+.layer-disabled { opacity: 0.4; pointer-events: none; }
+
+#legend { margin-top: 20px; }
+#legend h2 { margin-bottom: 10px; }
+.legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+.legend-color { width: 16px; height: 16px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.2); flex-shrink: 0; }
+
+#timeline {
+  background: #16213e;
+  border-top: 1px solid #0f3460;
+  padding: 12px 20px;
+  flex-shrink: 0;
+}
+
+#timeline-top { display: flex; align-items: center; gap: 16px; margin-bottom: 8px; }
+
+.timeline-btn {
+  background: #0f3460;
+  border: 1px solid #e94560;
+  color: #e94560;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.timeline-btn:hover { background: #e94560; color: #fff; }
+.timeline-btn.active { background: #e94560; color: #fff; }
+
+#speed-controls { display: flex; align-items: center; gap: 8px; }
+#speed-controls label { font-size: 11px; color: #888; }
+#speed-controls select {
+  background: #0f3460;
+  color: #e0e0e0;
+  border: 1px solid #333;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+#date-display {
+  font-size: 22px;
+  font-weight: 600;
+  color: #e94560;
+  min-width: 140px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+#timeline-context {
+  font-size: 12px;
+  color: #888;
+  flex: 1;
+  text-align: right;
+  font-style: italic;
+}
+
+#slider-container { position: relative; }
+#timeline-slider {
+  width: 100%;
+  height: 6px;
+  accent-color: #e94560;
+  cursor: pointer;
+}
+#keyframe-markers {
+  position: relative;
+  height: 12px;
+  margin-top: 2px;
+}
+.keyframe-tick {
+  position: absolute;
+  width: 2px;
+  height: 8px;
+  background: #e94560;
+  opacity: 0.6;
+  transform: translateX(-50%);
+}
+.keyframe-label {
+  position: absolute;
+  font-size: 9px;
+  color: #666;
+  transform: translateX(-50%);
+  top: 8px;
+  white-space: nowrap;
+}
+
+.leaflet-container { background: #1a1a2e !important; }
+.leaflet-control-attribution { font-size: 9px !important; background: rgba(22,33,62,0.8) !important; color: #666 !important; }
+.leaflet-control-attribution a { color: #888 !important; }
+.leaflet-control-zoom a { background: #16213e !important; color: #e0e0e0 !important; border-color: #0f3460 !important; }
+
+.empire-tooltip {
+  background: rgba(22,33,62,0.95) !important;
+  border: 1px solid #e94560 !important;
+  color: #e0e0e0 !important;
+  font-size: 13px !important;
+  padding: 6px 10px !important;
+  border-radius: 4px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+}
+.empire-tooltip .leaflet-tooltip-arrow { display: none; }
+
+.leaflet-popup-content-wrapper {
+  background: rgba(22,33,62,0.95) !important;
+  color: #e0e0e0 !important;
+  border: 1px solid #0f3460 !important;
+  border-radius: 6px !important;
+}
+.leaflet-popup-tip { background: rgba(22,33,62,0.95) !important; }
+.leaflet-popup-close-button { color: #888 !important; }
+.popup-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.popup-desc { font-size: 12px; color: #aaa; line-height: 1.4; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div>
+      <h1>DYNAMIC ATLAS</h1>
+      <div class="subtitle">Eastern Mediterranean &amp; Middle East, 500 BCE &ndash; 1453 CE</div>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="map"></div>
+    <div id="sidebar">
+      <h2>Layers</h2>
+      <div class="layer-group">
+        <label><input type="checkbox" id="layer-political" checked> Political Boundaries</label>
+        <input type="range" id="opacity-political" min="0" max="1" step="0.05" value="0.5">
+        <div class="range-label"><span>Transparent</span><span>Opaque</span></div>
+      </div>
+      <div class="layer-group layer-disabled">
+        <label><input type="checkbox" id="layer-religion" disabled> Religious Regions <small>(future)</small></label>
+        <input type="range" id="opacity-religion" min="0" max="1" step="0.05" value="0.4" disabled>
+      </div>
+      <div class="layer-group layer-disabled">
+        <label><input type="checkbox" id="layer-trade" disabled> Trade Routes <small>(future)</small></label>
+        <input type="range" id="opacity-trade" min="0" max="1" step="0.05" value="0.4" disabled>
+      </div>
+
+      <div id="legend">
+        <h2>Legend</h2>
+        <div id="legend-items"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="timeline">
+    <div id="timeline-top">
+      <button class="timeline-btn" id="play-btn" title="Play/Pause">&#9654;</button>
+      <div id="speed-controls">
+        <label>Speed:</label>
+        <select id="speed-select">
+          <option value="0.5">0.5x</option>
+          <option value="1" selected>1x</option>
+          <option value="2">2x</option>
+          <option value="3">3x</option>
+        </select>
+      </div>
+      <div id="date-display">500 BCE</div>
+      <div id="timeline-context"></div>
+    </div>
+    <div id="slider-container">
+      <input type="range" id="timeline-slider" min="-500" max="1453" value="-500" step="1">
+      <div id="keyframe-markers"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// ============================================================
+// DYNAMIC ATLAS — Historical Keyframe Data
+// ============================================================
+// Simplified polygon boundaries for major empires/states.
+// Coordinates are [lng, lat] pairs in GeoJSON format.
+// These are approximate representations for demonstration.
+
+const KEYFRAMES = [
+  {
+    year: -500,
+    label: "500 BCE",
+    context: "Classical Antiquity — the Achaemenid Persian Empire dominates from Egypt to Central Asia",
+    features: [
+      {
+        name: "Achaemenid Persian Empire",
+        color: "#D4A017",
+        desc: "Founded by Cyrus the Great, the Achaemenid Empire was the largest empire the ancient world had seen, stretching from Egypt and Anatolia to the Indus Valley.",
+        coords: [[[26,35],[28,31],[32,30],[34,29],[36,32],[40,37],[44,37],[48,38],[52,37],[56,34],[60,30],[62,26],[60,24],[56,22],[50,24],[46,30],[44,34],[42,37],[38,36],[35,35],[34,31],[32,27],[30,25],[28,28],[26,31],[26,35]]]
+      },
+      {
+        name: "Greek City-States",
+        color: "#4A90E2",
+        desc: "A collection of independent city-states including Athens, Sparta, Corinth, and Thebes, united by language and culture but frequently at war with each other.",
+        coords: [[[20,36],[22,35],[24,35],[26,36],[26,40],[24,41],[22,41],[20,40],[19,38],[20,36]]]
+      },
+      {
+        name: "Carthage",
+        color: "#9B59B6",
+        desc: "Phoenician trading empire controlling much of the western Mediterranean coast of North Africa, parts of Iberia, Sardinia, and western Sicily.",
+        coords: [[[8,37],[10,37],[11,36],[10,35],[9,34],[7,33],[4,34],[2,35],[0,35],[-2,35],[-4,34],[-5,33],[-3,32],[0,33],[3,33],[5,34],[7,35],[8,37]]]
+      },
+      {
+        name: "Kingdom of Kush",
+        color: "#E67E22",
+        desc: "Nubian kingdom along the Nile south of Egypt, maintaining independence and at times rivaling Egyptian power.",
+        coords: [[[30,22],[32,22],[34,20],[35,17],[34,14],[32,13],[30,14],[29,17],[28,20],[30,22]]]
+      }
+    ]
+  },
+  {
+    year: -323,
+    label: "323 BCE",
+    context: "Death of Alexander the Great — his empire fragments into successor kingdoms",
+    features: [
+      {
+        name: "Seleucid Empire",
+        color: "#3498DB",
+        desc: "The largest of Alexander's successor states, controlling Mesopotamia, Persia, and much of Central Asia under the Seleucid dynasty.",
+        coords: [[[36,32],[38,34],[40,37],[44,37],[48,38],[52,37],[56,34],[60,30],[62,26],[58,24],[52,26],[48,30],[44,34],[40,36],[38,35],[36,34],[34,31],[36,32]]]
+      },
+      {
+        name: "Ptolemaic Egypt",
+        color: "#2ECC71",
+        desc: "Egypt under the Ptolemaic dynasty, one of Alexander's successor states, controlling the Nile Valley, Cyrenaica, and parts of the Levant.",
+        coords: [[[25,31],[28,32],[32,32],[34,30],[34,28],[32,25],[30,22],[28,22],[25,24],[24,27],[25,31]]]
+      },
+      {
+        name: "Antigonid Macedon",
+        color: "#E94560",
+        desc: "The Antigonid dynasty controlled Macedon and exercised influence over the Greek city-states after the wars of Alexander's successors.",
+        coords: [[[20,38],[22,37],[24,38],[26,40],[26,42],[24,42],[22,42],[20,41],[19,39],[20,38]]]
+      },
+      {
+        name: "Carthage",
+        color: "#9B59B6",
+        desc: "Still a major Mediterranean power, Carthage controlled North Africa, parts of Iberia, and islands in the western Mediterranean.",
+        coords: [[[8,37],[10,37],[11,36],[10,35],[9,34],[7,33],[4,34],[2,35],[0,35],[-2,35],[-5,33],[-3,32],[0,33],[3,33],[5,34],[7,35],[8,37]]]
+      }
+    ]
+  },
+  {
+    year: 117,
+    label: "117 CE",
+    context: "Peak of the Roman Empire under Trajan — Rome controls the entire Mediterranean",
+    features: [
+      {
+        name: "Roman Empire",
+        color: "#E94560",
+        desc: "At its greatest extent under Emperor Trajan, the Roman Empire encircled the entire Mediterranean, from Britain to Mesopotamia, from the Rhine to the Sahara.",
+        coords: [[[-8,37],[-5,36],[-2,36],[0,38],[3,43],[6,46],[8,48],[12,48],[15,47],[16,48],[20,48],[24,45],[26,42],[28,42],[30,40],[34,38],[36,37],[40,37],[42,36],[44,34],[40,32],[36,32],[34,30],[32,27],[30,24],[28,22],[25,25],[22,32],[18,33],[14,34],[10,36],[8,37],[6,38],[3,37],[0,36],[-3,35],[-5,34],[-8,35],[-10,37],[-8,37]]]
+      },
+      {
+        name: "Parthian Empire",
+        color: "#D4A017",
+        desc: "The Arsacid dynasty ruled Parthia, a major rival to Rome controlling Persia, Mesopotamia's eastern reaches, and the overland trade routes to China.",
+        coords: [[[44,34],[46,36],[48,38],[52,38],[56,36],[60,32],[62,28],[60,24],[56,24],[52,26],[48,30],[46,32],[44,34]]]
+      },
+      {
+        name: "Kingdom of Aksum",
+        color: "#E67E22",
+        desc: "A powerful trading kingdom in the Horn of Africa, Aksum controlled the Red Sea trade and would later become one of the first states to adopt Christianity.",
+        coords: [[[36,16],[38,15],[40,13],[42,11],[43,10],[42,8],[40,9],[38,10],[36,12],[35,14],[36,16]]]
+      }
+    ]
+  },
+  {
+    year: 395,
+    label: "395 CE",
+    context: "Division of the Roman Empire — East and West split permanently after the death of Theodosius I",
+    features: [
+      {
+        name: "Western Roman Empire",
+        color: "#C0392B",
+        desc: "The western half of the divided Roman Empire, increasingly pressured by Germanic migrations and invasions. It would fall in 476 CE.",
+        coords: [[[-8,37],[-5,36],[-2,36],[0,38],[3,43],[6,46],[8,48],[12,48],[15,47],[16,46],[18,44],[18,42],[16,40],[14,38],[12,37],[10,36],[8,36],[6,37],[4,37],[2,36],[0,35],[-3,34],[-5,34],[-8,35],[-10,37],[-8,37]]]
+      },
+      {
+        name: "Eastern Roman (Byzantine) Empire",
+        color: "#8E44AD",
+        desc: "The eastern half of the Roman Empire, centered on Constantinople. Wealthier and more urbanized, it would survive for another thousand years.",
+        coords: [[[18,44],[20,46],[24,45],[26,42],[28,42],[30,40],[34,38],[36,37],[38,36],[36,34],[34,31],[32,28],[30,26],[28,26],[25,28],[22,32],[18,34],[16,36],[14,38],[16,40],[18,42],[18,44]]]
+      },
+      {
+        name: "Sassanid Persian Empire",
+        color: "#D4A017",
+        desc: "The last great pre-Islamic Persian empire, rivals of Rome/Byzantium. They controlled Mesopotamia, Persia, and parts of Central Asia.",
+        coords: [[[40,36],[42,37],[46,38],[50,38],[54,36],[58,34],[62,30],[62,26],[58,24],[54,24],[50,26],[46,30],[44,34],[42,36],[40,36]]]
+      },
+      {
+        name: "Kingdom of Aksum",
+        color: "#E67E22",
+        desc: "Now a Christian kingdom, Aksum remained a major Red Sea trading power and at times projected influence into southern Arabia.",
+        coords: [[[36,16],[38,15],[40,13],[42,11],[43,10],[42,8],[40,9],[38,10],[36,12],[35,14],[36,16]]]
+      }
+    ]
+  },
+  {
+    year: 632,
+    label: "632 CE",
+    context: "Death of Muhammad — the Islamic Caliphate begins its rapid expansion from Arabia",
+    features: [
+      {
+        name: "Byzantine Empire",
+        color: "#8E44AD",
+        desc: "Exhausted by decades of war with Sassanid Persia, Byzantium retained Anatolia, Greece, and parts of Italy but was about to lose the Levant and Egypt to Arab conquest.",
+        coords: [[[18,44],[20,46],[24,45],[26,42],[28,42],[30,40],[34,38],[36,37],[38,36],[36,34],[34,32],[30,34],[26,36],[22,37],[18,38],[16,38],[14,38],[16,40],[18,42],[18,44]]]
+      },
+      {
+        name: "Sassanid Persian Empire",
+        color: "#D4A017",
+        desc: "Fatally weakened by war with Byzantium and internal strife, the Sassanid Empire was on the verge of complete collapse before the Arab conquests.",
+        coords: [[[40,36],[42,37],[46,38],[50,38],[54,36],[58,34],[62,30],[62,26],[58,24],[54,24],[50,26],[46,30],[44,34],[42,36],[40,36]]]
+      },
+      {
+        name: "Rashidun Caliphate",
+        color: "#27AE60",
+        desc: "The first Islamic caliphate under the 'Rightly Guided' successors of Muhammad, rapidly expanding from the Arabian Peninsula into the Levant and Mesopotamia.",
+        coords: [[[34,30],[36,32],[38,34],[40,32],[42,30],[44,28],[46,24],[44,20],[42,16],[40,14],[38,16],[36,18],[34,20],[32,22],[34,26],[34,30]]]
+      },
+      {
+        name: "Frankish Kingdom",
+        color: "#3498DB",
+        desc: "The Merovingian Franks controlled much of modern France and western Germany, the most powerful of the post-Roman Germanic kingdoms.",
+        coords: [[[-2,44],[0,46],[2,48],[4,50],[8,50],[10,49],[12,48],[10,46],[8,44],[6,43],[4,43],[2,44],[0,43],[-2,44]]]
+      }
+    ]
+  },
+  {
+    year: 750,
+    label: "750 CE",
+    context: "Rise of the Abbasid Caliphate — Islamic civilization at its cultural and geographic zenith",
+    features: [
+      {
+        name: "Abbasid Caliphate",
+        color: "#27AE60",
+        desc: "The Abbasid Caliphate moved the capital to Baghdad and presided over a golden age of Islamic science, philosophy, and culture, ruling from North Africa to Central Asia.",
+        coords: [[[0,33],[4,34],[8,35],[12,35],[16,34],[20,34],[24,32],[28,32],[32,30],[34,30],[36,32],[38,34],[42,36],[46,38],[50,38],[54,36],[58,34],[62,30],[62,26],[58,22],[54,20],[50,18],[46,16],[42,14],[38,16],[36,18],[34,20],[32,22],[30,22],[28,24],[24,28],[20,30],[16,32],[12,33],[8,33],[4,32],[0,31],[0,33]]]
+      },
+      {
+        name: "Byzantine Empire",
+        color: "#8E44AD",
+        desc: "Reduced to Anatolia, Greece, and fragments of Italy, Byzantium endured as a center of Christian civilization and a bulwark against further Islamic expansion into Europe.",
+        coords: [[[22,36],[24,38],[26,40],[28,42],[30,40],[32,40],[34,38],[36,38],[38,36],[36,34],[34,36],[30,38],[26,38],[24,36],[22,36]]]
+      },
+      {
+        name: "Frankish Empire (Carolingian)",
+        color: "#3498DB",
+        desc: "Under the early Carolingians, the Frankish realm expanded to dominate Western Europe. Charlemagne would be crowned Emperor in 800 CE.",
+        coords: [[[-2,44],[0,46],[2,48],[4,50],[8,50],[10,50],[14,48],[16,48],[14,46],[12,44],[10,43],[8,42],[6,42],[4,43],[2,44],[0,43],[-2,44]]]
+      },
+      {
+        name: "Umayyad Emirate of Cordoba",
+        color: "#16A085",
+        desc: "After the Abbasid revolution, a surviving Umayyad prince established an independent emirate in Iberia, continuing Umayyad rule in Al-Andalus.",
+        coords: [[[-8,37],[-6,38],[-4,40],[-2,42],[0,42],[2,40],[0,38],[-2,37],[-4,36],[-6,36],[-8,37]]]
+      }
+    ]
+  },
+  {
+    year: 1000,
+    label: "1000 CE",
+    context: "The medieval world — Byzantium revives, Fatimids control Egypt, Seljuk Turks push westward",
+    features: [
+      {
+        name: "Byzantine Empire",
+        color: "#8E44AD",
+        desc: "Under the Macedonian dynasty, Byzantium experienced a military and cultural revival, reconquering parts of the Levant and pushing back into the Balkans.",
+        coords: [[[20,36],[22,38],[24,40],[26,42],[28,42],[30,40],[32,40],[34,38],[36,38],[38,36],[36,34],[34,34],[30,36],[26,36],[24,36],[22,36],[20,36]]]
+      },
+      {
+        name: "Fatimid Caliphate",
+        color: "#27AE60",
+        desc: "A Shia Ismaili caliphate based in Cairo, the Fatimids controlled Egypt, North Africa, the Hejaz, and parts of the Levant.",
+        coords: [[[10,34],[14,33],[18,33],[22,33],[26,32],[30,30],[34,30],[36,28],[34,24],[32,22],[30,20],[28,22],[26,26],[22,30],[18,32],[14,33],[10,33],[8,32],[6,32],[4,33],[6,34],[10,34]]]
+      },
+      {
+        name: "Seljuk Empire",
+        color: "#D4A017",
+        desc: "Turkic nomads who conquered Persia and Mesopotamia, the Seljuks championed Sunni Islam and their victory at Manzikert (1071) would open Anatolia to Turkish settlement.",
+        coords: [[[40,36],[42,37],[46,38],[50,38],[54,36],[58,34],[60,32],[58,28],[54,26],[50,26],[46,28],[44,30],[42,32],[40,34],[40,36]]]
+      },
+      {
+        name: "Holy Roman Empire",
+        color: "#3498DB",
+        desc: "A decentralized realm of German, Italian, and Burgundian territories claiming succession from Charlemagne and the Roman Empire.",
+        coords: [[[6,46],[8,48],[10,50],[14,50],[16,50],[18,48],[16,46],[14,44],[12,44],[10,44],[8,44],[6,46]]]
+      },
+      {
+        name: "Umayyad Caliphate of Cordoba",
+        color: "#16A085",
+        desc: "At its peak under Abd al-Rahman III, the Caliphate of Cordoba was the most advanced state in Western Europe.",
+        coords: [[[-8,37],[-6,38],[-4,40],[-2,42],[0,42],[2,40],[0,38],[-2,37],[-4,36],[-6,36],[-8,37]]]
+      }
+    ]
+  },
+  {
+    year: 1200,
+    label: "1200 CE",
+    context: "The Crusades era — Crusader states dot the Levant, Saladin's Ayyubid dynasty unites Egypt and Syria",
+    features: [
+      {
+        name: "Byzantine Empire (diminished)",
+        color: "#8E44AD",
+        desc: "Severely weakened after the Fourth Crusade (1204) would sack Constantinople. Here shown just before that catastrophe, reduced but still holding Anatolia and Greece.",
+        coords: [[[22,38],[24,40],[26,42],[28,42],[30,40],[32,40],[34,38],[32,36],[30,36],[28,36],[26,36],[24,36],[22,38]]]
+      },
+      {
+        name: "Ayyubid Sultanate",
+        color: "#27AE60",
+        desc: "Founded by Saladin after defeating the Fatimids and recapturing Jerusalem, the Ayyubid dynasty controlled Egypt, Syria, and parts of the Arabian Peninsula.",
+        coords: [[[30,28],[32,30],[34,32],[36,34],[38,36],[40,34],[38,32],[36,30],[36,28],[34,26],[32,24],[30,22],[28,24],[30,28]]]
+      },
+      {
+        name: "Crusader States",
+        color: "#E94560",
+        desc: "The remnants of the Crusader kingdoms — the County of Tripoli, Principality of Antioch, and the Kingdom of Jerusalem — clinging to the Levantine coast.",
+        coords: [[[34,34],[36,34],[36,32],[35,31],[34,32],[34,34]]]
+      },
+      {
+        name: "Almohad Caliphate",
+        color: "#16A085",
+        desc: "A Berber Muslim dynasty controlling North Africa and Al-Andalus, succeeding the Almoravids as the dominant power of the western Islamic world.",
+        coords: [[[-8,37],[-6,38],[-4,40],[-2,40],[0,38],[0,36],[-2,34],[-4,32],[-2,30],[0,30],[4,32],[8,34],[10,34],[8,32],[4,30],[0,28],[-4,28],[-8,30],[-10,32],[-10,34],[-8,37]]]
+      },
+      {
+        name: "Khwarezmian Empire",
+        color: "#D4A017",
+        desc: "A Turkic-Persian empire controlling Central Asia and eastern Persia, about to be devastated by the Mongol invasion.",
+        coords: [[[48,34],[50,36],[54,38],[58,38],[62,36],[64,32],[62,28],[58,28],[54,30],[50,32],[48,34]]]
+      },
+      {
+        name: "Holy Roman Empire",
+        color: "#3498DB",
+        desc: "Under the Hohenstaufen dynasty, the Empire was embroiled in conflicts with the Papacy and Italian city-states.",
+        coords: [[[6,46],[8,48],[10,50],[14,50],[16,50],[18,48],[16,46],[14,44],[12,44],[10,44],[8,44],[6,46]]]
+      }
+    ]
+  },
+  {
+    year: 1453,
+    label: "1453 CE",
+    context: "Fall of Constantinople — the Ottoman Empire conquers the Byzantine capital, ending the Roman legacy",
+    features: [
+      {
+        name: "Ottoman Empire",
+        color: "#E94560",
+        desc: "Having conquered Constantinople in 1453, the Ottoman Empire now controlled Anatolia, the Balkans, and was poised to become the dominant power of the eastern Mediterranean for centuries.",
+        coords: [[[20,38],[22,40],[24,42],[26,44],[28,42],[30,40],[32,40],[34,38],[36,38],[40,38],[42,36],[40,34],[38,32],[36,30],[34,28],[32,30],[30,32],[28,34],[26,36],[24,36],[22,36],[20,38]]]
+      },
+      {
+        name: "Mamluk Sultanate",
+        color: "#27AE60",
+        desc: "A military caste of slave soldiers who seized power in Egypt, the Mamluks controlled Egypt, the Levant, and the Hejaz, and had defeated both the Crusaders and the Mongols.",
+        coords: [[[30,28],[32,30],[34,30],[36,30],[38,30],[36,26],[34,22],[32,20],[30,20],[28,22],[28,26],[30,28]]]
+      },
+      {
+        name: "Timurid Empire",
+        color: "#D4A017",
+        desc: "The remnants of Timur's vast empire, now fragmenting but still controlling Persia and Central Asia under his descendants.",
+        coords: [[[44,34],[46,36],[50,38],[54,38],[58,36],[62,34],[64,30],[62,26],[58,24],[54,26],[50,28],[46,30],[44,34]]]
+      },
+      {
+        name: "Kingdom of France",
+        color: "#3498DB",
+        desc: "Emerging from the Hundred Years' War, France was consolidating as a centralized kingdom and the most powerful state in Western Europe.",
+        coords: [[[-2,44],[0,46],[2,48],[4,50],[6,48],[8,46],[6,44],[4,43],[2,42],[0,43],[-2,44]]]
+      },
+      {
+        name: "Hafsid Sultanate",
+        color: "#16A085",
+        desc: "A Berber dynasty controlling Tunisia and eastern Algeria, one of several successor states to the Almohad Caliphate in North Africa.",
+        coords: [[[6,34],[8,35],[10,35],[12,34],[10,32],[8,32],[6,33],[6,34]]]
+      },
+      {
+        name: "Kingdom of Ethiopia",
+        color: "#E67E22",
+        desc: "The Solomonic dynasty restored Christian Ethiopian rule, maintaining an ancient Christian kingdom in the Horn of Africa.",
+        coords: [[[34,14],[36,15],[38,14],[40,12],[42,10],[40,8],[38,8],[36,10],[34,12],[34,14]]]
+      }
+    ]
+  }
+];
+
+// ============================================================
+// MAP INITIALIZATION
+// ============================================================
+
+const map = L.map('map', {
+  center: [34, 30],
+  zoom: 4,
+  minZoom: 3,
+  maxZoom: 8,
+  zoomControl: true,
+  attributionControl: true
+});
+
+// Use CartoDB Positron (light, minimal) as base
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+  subdomains: 'abcd',
+  maxZoom: 20
+}).addTo(map);
+
+// Add a labels-only layer on top so labels appear above empire overlays
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+  subdomains: 'abcd',
+  maxZoom: 20,
+  pane: 'shadowPane' // render above overlays
+}).addTo(map);
+
+
+// ============================================================
+// STATE
+// ============================================================
+
+let currentLayers = [];
+let currentKeyframeIndex = 0;
+let isPlaying = false;
+let playSpeed = 1;
+let animationId = null;
+let currentYear = -500;
+let targetOpacity = 0.5;
+let isTransitioning = false;
+
+const keyframeDates = KEYFRAMES.map(k => k.year);
+const minYear = -500;
+const maxYear = 1453;
+
+// ============================================================
+// KEYFRAME RENDERING
+// ============================================================
+
+function clearLayers() {
+  currentLayers.forEach(layer => map.removeLayer(layer));
+  currentLayers = [];
+}
+
+function getKeyframeForYear(year) {
+  // Find the keyframe that's closest but not after the current year
+  let best = 0;
+  for (let i = 0; i < KEYFRAMES.length; i++) {
+    if (KEYFRAMES[i].year <= year) best = i;
+  }
+  return best;
+}
+
+function renderKeyframe(index, opacity) {
+  clearLayers();
+  const kf = KEYFRAMES[index];
+  if (!kf) return;
+
+  const legendEl = document.getElementById('legend-items');
+  legendEl.innerHTML = '';
+
+  kf.features.forEach(feat => {
+    // Convert coords to Leaflet format [lat, lng]
+    const latLngs = feat.coords[0].map(c => [c[1], c[0]]);
+
+    const polygon = L.polygon(latLngs, {
+      color: feat.color,
+      fillColor: feat.color,
+      fillOpacity: opacity,
+      weight: 2,
+      opacity: 0.8,
+      smoothFactor: 1.5
+    });
+
+    // Tooltip on hover
+    polygon.bindTooltip(feat.name, {
+      className: 'empire-tooltip',
+      sticky: true,
+      direction: 'top',
+      offset: [0, -10]
+    });
+
+    // Popup on click
+    polygon.bindPopup(
+      `<div class="popup-title" style="color:${feat.color}">${feat.name}</div>` +
+      `<div class="popup-desc">${feat.desc}</div>`,
+      { maxWidth: 280 }
+    );
+
+    // Hover effects
+    polygon.on('mouseover', function() {
+      this.setStyle({ fillOpacity: Math.min(opacity + 0.2, 0.9), weight: 3 });
+    });
+    polygon.on('mouseout', function() {
+      this.setStyle({ fillOpacity: opacity, weight: 2 });
+    });
+
+    polygon.addTo(map);
+    currentLayers.push(polygon);
+
+    // Legend
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<span class="legend-color" style="background:${feat.color}"></span><span>${feat.name}</span>`;
+    legendEl.appendChild(item);
+  });
+
+  // Update context
+  document.getElementById('timeline-context').textContent = kf.context;
+}
+
+// ============================================================
+// CROSSFADE TRANSITION
+// ============================================================
+
+function transitionToKeyframe(newIndex, duration) {
+  if (isTransitioning || newIndex === currentKeyframeIndex) {
+    if (newIndex !== currentKeyframeIndex) currentKeyframeIndex = newIndex;
+    renderKeyframe(newIndex, targetOpacity);
+    return;
+  }
+
+  isTransitioning = true;
+  duration = duration || 600;
+  const halfDur = duration / 2;
+  const startTime = performance.now();
+
+  function animateTransition(now) {
+    const elapsed = now - startTime;
+
+    if (elapsed < halfDur) {
+      // Fade out
+      const progress = elapsed / halfDur;
+      const opacity = targetOpacity * (1 - progress);
+      currentLayers.forEach(layer => {
+        layer.setStyle({ fillOpacity: opacity, opacity: 0.8 * (1 - progress) });
+      });
+      requestAnimationFrame(animateTransition);
+    } else if (elapsed < duration) {
+      // Swap at midpoint then fade in
+      if (currentKeyframeIndex !== newIndex) {
+        currentKeyframeIndex = newIndex;
+        renderKeyframe(newIndex, 0);
+      }
+      const progress = (elapsed - halfDur) / halfDur;
+      const opacity = targetOpacity * progress;
+      currentLayers.forEach(layer => {
+        layer.setStyle({ fillOpacity: opacity, opacity: 0.8 * progress });
+      });
+      requestAnimationFrame(animateTransition);
+    } else {
+      // Done
+      currentKeyframeIndex = newIndex;
+      currentLayers.forEach(layer => {
+        layer.setStyle({ fillOpacity: targetOpacity, opacity: 0.8 });
+      });
+      isTransitioning = false;
+    }
+  }
+
+  requestAnimationFrame(animateTransition);
+}
+
+// ============================================================
+// TIMELINE CONTROLS
+// ============================================================
+
+const slider = document.getElementById('timeline-slider');
+const dateDisplay = document.getElementById('date-display');
+const playBtn = document.getElementById('play-btn');
+const speedSelect = document.getElementById('speed-select');
+
+function formatYear(year) {
+  if (year < 0) return `${Math.abs(year)} BCE`;
+  if (year === 0) return '1 CE';
+  return `${year} CE`;
+}
+
+function updateDateDisplay(year) {
+  dateDisplay.textContent = formatYear(Math.round(year));
+}
+
+// Keyframe tick marks
+const markersEl = document.getElementById('keyframe-markers');
+KEYFRAMES.forEach(kf => {
+  const pct = ((kf.year - minYear) / (maxYear - minYear)) * 100;
+  const tick = document.createElement('div');
+  tick.className = 'keyframe-tick';
+  tick.style.left = pct + '%';
+  markersEl.appendChild(tick);
+
+  const lbl = document.createElement('div');
+  lbl.className = 'keyframe-label';
+  lbl.style.left = pct + '%';
+  lbl.textContent = kf.label;
+  markersEl.appendChild(lbl);
+});
+
+// Slider input
+slider.addEventListener('input', function() {
+  currentYear = parseInt(this.value);
+  updateDateDisplay(currentYear);
+  const idx = getKeyframeForYear(currentYear);
+  if (idx !== currentKeyframeIndex) {
+    transitionToKeyframe(idx, 300);
+  }
+});
+
+// Play/Pause
+playBtn.addEventListener('click', function() {
+  isPlaying = !isPlaying;
+  this.innerHTML = isPlaying ? '&#9646;&#9646;' : '&#9654;';
+  this.classList.toggle('active', isPlaying);
+  if (isPlaying) {
+    if (currentYear >= maxYear) {
+      currentYear = minYear;
+      slider.value = currentYear;
+    }
+    lastPlayTime = performance.now();
+    playAnimation();
+  }
+});
+
+speedSelect.addEventListener('change', function() {
+  playSpeed = parseFloat(this.value);
+});
+
+let lastPlayTime = 0;
+
+function playAnimation() {
+  if (!isPlaying) return;
+
+  const now = performance.now();
+  const delta = now - lastPlayTime;
+  lastPlayTime = now;
+
+  // Move ~200 years per second at 1x speed
+  const yearsPerMs = 200 / 1000;
+  currentYear += delta * yearsPerMs * playSpeed;
+
+  if (currentYear >= maxYear) {
+    currentYear = maxYear;
+    isPlaying = false;
+    playBtn.innerHTML = '&#9654;';
+    playBtn.classList.remove('active');
+  }
+
+  slider.value = currentYear;
+  updateDateDisplay(currentYear);
+
+  const idx = getKeyframeForYear(currentYear);
+  if (idx !== currentKeyframeIndex) {
+    transitionToKeyframe(idx, 500);
+  }
+
+  if (isPlaying) {
+    animationId = requestAnimationFrame(playAnimation);
+  }
+}
+
+// ============================================================
+// LAYER CONTROLS
+// ============================================================
+
+document.getElementById('layer-political').addEventListener('change', function() {
+  const visible = this.checked;
+  currentLayers.forEach(layer => {
+    if (visible) {
+      layer.setStyle({ fillOpacity: targetOpacity, opacity: 0.8 });
+    } else {
+      layer.setStyle({ fillOpacity: 0, opacity: 0 });
+    }
+  });
+});
+
+document.getElementById('opacity-political').addEventListener('input', function() {
+  targetOpacity = parseFloat(this.value);
+  const isVisible = document.getElementById('layer-political').checked;
+  if (isVisible) {
+    currentLayers.forEach(layer => {
+      layer.setStyle({ fillOpacity: targetOpacity });
+    });
+  }
+});
+
+// ============================================================
+// INITIALIZE
+// ============================================================
+
+renderKeyframe(0, targetOpacity);
+updateDateDisplay(minYear);
+</script>
+</body>
+</html>
