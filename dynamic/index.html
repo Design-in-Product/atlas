@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dynamic Atlas V6: Historical Map Viewer</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div>
+      <h1>DYNAMIC ATLAS <span style="font-size:12px;color:#e94560">V6</span></h1>
+      <div class="subtitle">Eastern Mediterranean &amp; Middle East, 500 BCE &ndash; 1453 CE</div>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="map"></div>
+    <div id="sidebar">
+      <h2>Layers</h2>
+      <div class="layer-group">
+        <label><input type="checkbox" id="layer-political" checked> Political Boundaries</label>
+        <input type="range" id="opacity-political" min="0" max="1" step="0.05" value="0.5">
+        <div class="range-label"><span>Transparent</span><span>Opaque</span></div>
+      </div>
+      <div class="layer-group">
+        <label><input type="checkbox" id="layer-modern"> Modern Borders <small>(reference)</small></label>
+        <input type="range" id="opacity-modern" min="0" max="1" step="0.05" value="0.3">
+        <div class="range-label"><span>Transparent</span><span>Opaque</span></div>
+      </div>
+      <div class="layer-group">
+        <label><input type="checkbox" id="layer-labels" checked> Empire Labels</label>
+      </div>
+      <div class="layer-group layer-disabled">
+        <label><input type="checkbox" id="layer-religion" disabled> Religious Regions <small>(future)</small></label>
+      </div>
+      <div class="layer-group layer-disabled">
+        <label><input type="checkbox" id="layer-trade" disabled> Trade Routes <small>(future)</small></label>
+      </div>
+
+      <div id="legend">
+        <h2>Legend</h2>
+        <div id="legend-items"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="timeline">
+    <div id="timeline-top">
+      <button class="timeline-btn" id="play-btn" title="Play/Pause">&#9654;</button>
+      <div id="speed-controls">
+        <label>Speed:</label>
+        <select id="speed-select">
+          <option value="0.25">&frac12;x</option>
+          <option value="0.5" selected>1x</option>
+          <option value="1">2x</option>
+          <option value="1.5">3x</option>
+        </select>
+      </div>
+      <div id="date-display">500 BCE</div>
+      <div id="timeline-context"></div>
+    </div>
+    <div id="slider-container">
+      <input type="range" id="timeline-slider" min="-500" max="1453" value="-500" step="1">
+      <div id="keyframe-markers"></div>
+    </div>
+  </div>
+</div>
+
+<!-- External dependencies -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<!-- Data -->
+<script src="keyframes.js"></script>
+<script src="transitions.js"></script>
+
+<!-- Application logic (load order matters) -->
+<script src="main.js"></script>
+<script src="renderer.js"></script>
+<script src="morphing.js"></script>
+<script src="timeline.js"></script>
+<script src="controls.js"></script>
+</body>
+</html>
