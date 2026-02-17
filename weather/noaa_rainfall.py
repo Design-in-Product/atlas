@@ -59,7 +59,7 @@ def _rain_season_start(today: date) -> date:
     return date(today.year - 1, 10, 1)
 
 
-def fetch_rainfall(start: date, end: date) -> list[dict]:
+def fetch_rainfall(start: date, end: date, debug: bool = False) -> list[dict]:
     """Fetch daily precipitation from the NOAA NCEI public API.
 
     Returns a list of dicts with keys: date, precipitation_in.
@@ -96,10 +96,16 @@ def fetch_rainfall(start: date, end: date) -> list[dict]:
             print(f"Error: Could not reach NOAA API: {exc.reason}", file=sys.stderr)
             sys.exit(1)
 
+        if debug:
+            print(f"DEBUG URL: {url}", file=sys.stderr)
+            print(f"DEBUG response ({len(body)} bytes): {body[:500]}", file=sys.stderr)
+
         try:
             data = json.loads(body)
         except json.JSONDecodeError:
             # Empty response means no data for that range (e.g., future dates)
+            if debug:
+                print(f"DEBUG: JSONDecodeError, body was: {body[:500]!r}", file=sys.stderr)
             data = []
 
         if isinstance(data, dict):
@@ -364,6 +370,7 @@ def main() -> None:
     )
     parser.add_argument("--json", action="store_true", help="Output raw JSON.")
     parser.add_argument("--csv", action="store_true", help="Output CSV.")
+    parser.add_argument("--debug", action="store_true", help="Show raw API response.")
     parser.add_argument(
         "--setup-email",
         action="store_true",
@@ -384,7 +391,7 @@ def main() -> None:
     print(f"Fetching rainfall data for {STATION_NAME} ({STATION_ID})...", file=sys.stderr)
     print(f"Period: {start} to {end}", file=sys.stderr)
 
-    records = fetch_rainfall(start, end)
+    records = fetch_rainfall(start, end, debug=args.debug)
 
     if args.json:
         print(json.dumps(records, indent=2))
