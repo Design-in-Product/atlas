@@ -18,7 +18,7 @@ First-time email setup (stores credentials in macOS Keychain):
 Data source:
     NOAA NCEI Access Data Service (public, no auth)
     https://www.ncei.noaa.gov/access/services/data/v1
-    Station: USC00046646 (Palo Alto, CA)
+    Stations tried (in order): Palo Alto, Redwood City, San Jose Airport, SFO Airport
 """
 
 import argparse
@@ -41,11 +41,21 @@ from urllib.request import Request, urlopen
 # Configuration
 # ---------------------------------------------------------------------------
 NOAA_API_BASE = "https://www.ncei.noaa.gov/access/services/data/v1"
-STATION_ID = "USC00046646"       # Palo Alto, CA
-STATION_NAME = "Palo Alto, CA"
 DATASET = "daily-summaries"
 DATA_TYPES = "PRCP"              # Precipitation (tenths of mm from GHCND)
 UNITS = "standard"               # API returns inches when units=standard
+
+# Stations to try, in order of proximity to Palo Alto.
+# COOP stations (USC*) may stop reporting without notice;
+# airport stations (USW*) are automated and more reliable.
+STATIONS = [
+    ("USC00046646", "Palo Alto, CA"),
+    ("USC00047339", "Redwood City, CA"),
+    ("USW00023293", "San Jose Airport, CA"),
+    ("USW00023234", "SFO Airport, CA"),
+]
+DEFAULT_STATION_ID = STATIONS[0][0]
+DEFAULT_STATION_NAME = STATIONS[0][1]
 
 
 def _rain_season_start(today: date) -> date:
@@ -59,7 +69,8 @@ def _rain_season_start(today: date) -> date:
     return date(today.year - 1, 10, 1)
 
 
-def fetch_rainfall(start: date, end: date, debug: bool = False) -> list[dict]:
+def fetch_rainfall(start: date, end: date, station_id: str = DEFAULT_STATION_ID,
+                   debug: bool = False) -> list[dict]:
     """Fetch daily precipitation from the NOAA NCEI public API.
 
     Returns a list of dicts with keys: date, precipitation_in.
@@ -75,7 +86,7 @@ def fetch_rainfall(start: date, end: date, debug: bool = False) -> list[dict]:
         params = {
             "dataset": DATASET,
             "dataTypes": DATA_TYPES,
-            "stations": STATION_ID,
+            "stations": station_id,
             "startDate": chunk_start.isoformat(),
             "endDate": chunk_end.isoformat(),
             "format": "json",
@@ -128,14 +139,16 @@ def fetch_rainfall(start: date, end: date, debug: bool = False) -> list[dict]:
     return all_records
 
 
-def format_report(records: list[dict], season_start: date, today: date) -> str:
+def format_report(records: list[dict], season_start: date, today: date,
+                  station_id: str = DEFAULT_STATION_ID,
+                  station_name: str = DEFAULT_STATION_NAME) -> str:
     """Build a human-readable rainfall report."""
     lines: list[str] = []
 
     lines.append("=" * 62)
-    lines.append(f"  NOAA Daily Rainfall Report — {STATION_NAME}")
+    lines.append(f"  NOAA Daily Rainfall Report — {station_name}")
     lines.append(f"  Rain season: {season_start.strftime('%b %d, %Y')} – {today.strftime('%b %d, %Y')}")
-    lines.append(f"  Station: {STATION_ID}")
+    lines.append(f"  Station: {station_id}")
     lines.append(f"  Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     lines.append("=" * 62)
     lines.append("")
@@ -372,6 +385,13 @@ def main() -> None:
     parser.add_argument("--csv", action="store_true", help="Output CSV.")
     parser.add_argument("--debug", action="store_true", help="Show raw API response.")
     parser.add_argument(
+        "--station",
+        type=str,
+        default=None,
+        metavar="ID",
+        help="Use a specific GHCND station ID (e.g. USW00023293). Disables fallback.",
+    )
+    parser.add_argument(
         "--setup-email",
         action="store_true",
         help="Store SMTP credentials in the macOS Keychain, then exit.",
@@ -388,17 +408,33 @@ def main() -> None:
     start = datetime.strptime(args.start, "%Y-%m-%d").date() if args.start else season_start
     end = datetime.strptime(args.end, "%Y-%m-%d").date() if args.end else today
 
-    print(f"Fetching rainfall data for {STATION_NAME} ({STATION_ID})...", file=sys.stderr)
-    print(f"Period: {start} to {end}", file=sys.stderr)
+    # Determine which station(s) to try
+    if args.station:
+        stations_to_try = [(args.station, args.station)]
+    else:
+        stations_to_try = list(STATIONS)
 
-    records = fetch_rainfall(start, end, debug=args.debug)
+    records: list[dict] = []
+    used_id = stations_to_try[0][0]
+    used_name = stations_to_try[0][1]
+
+    for sid, sname in stations_to_try:
+        print(f"Fetching rainfall data for {sname} ({sid})...", file=sys.stderr)
+        print(f"Period: {start} to {end}", file=sys.stderr)
+        records = fetch_rainfall(start, end, station_id=sid, debug=args.debug)
+        if records:
+            used_id, used_name = sid, sname
+            break
+        if len(stations_to_try) > 1:
+            print(f"  No data from {sname}, trying next station...", file=sys.stderr)
 
     if args.json:
         print(json.dumps(records, indent=2))
     elif args.csv:
         print(output_csv(records), end="")
     else:
-        report = format_report(records, start, end)
+        report = format_report(records, start, end,
+                               station_id=used_id, station_name=used_name)
         print(report)
 
         if args.email:
