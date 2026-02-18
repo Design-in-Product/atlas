@@ -2,7 +2,7 @@
 """
 Generate equirectangular tectonic plate frames for Blender globe animation.
 
-Produces 200 PNG frames (1000 Ma → 0 Ma, 5 Ma steps) showing continental
+Produces 1000 PNG frames (1000 Ma → 0 Ma, 1 Ma steps) showing continental
 positions, coastlines, and plate boundaries using the Merdith et al. (2021)
 plate reconstruction model.
 
@@ -31,7 +31,7 @@ DPI = 200
 
 TIME_START = 1000  # Ma (Rodinia)
 TIME_END = 0       # Ma (Present)
-TIME_STEP = 5      # Ma per frame
+TIME_STEP = 1      # Ma per frame
 
 # Color scheme
 OCEAN_COLOR = '#1a425a'
@@ -147,13 +147,7 @@ def render_frame_gplately(time_ma, frame_idx):
     except Exception:
         pass
 
-    # Time label
-    ax.text(0.02, 0.02, f'{int(time_ma)} Ma',
-            transform=ax.transAxes, fontsize=16, color='white',
-            fontweight='bold', va='bottom',
-            bbox=dict(boxstyle='round,pad=0.3', facecolor='black', alpha=0.6))
-
-    # Save
+    # Save (no text label — subtitle overlay handles time/era display)
     out_path = os.path.join(FRAMES_DIR, f'{FRAME_PREFIX}{frame_idx:04d}.png')
     fig.savefig(out_path, dpi=DPI, facecolor=OCEAN_COLOR, pad_inches=0)
     plt.close(fig)
@@ -183,13 +177,7 @@ def render_frame_pygplates(time_ma, frame_idx):
             ax.fill(lons, lats, color=CONTINENT_COLOR, edgecolor=COASTLINE_COLOR,
                     linewidth=0.5, transform=ccrs.Geodetic())
 
-    # Time label
-    ax.text(0.02, 0.02, f'{int(time_ma)} Ma',
-            transform=ax.transAxes, fontsize=16, color='white',
-            fontweight='bold', va='bottom',
-            bbox=dict(boxstyle='round,pad=0.3', facecolor='black', alpha=0.6))
-
-    # Save
+    # Save (no text label — subtitle overlay handles time/era display)
     out_path = os.path.join(FRAMES_DIR, f'{FRAME_PREFIX}{frame_idx:04d}.png')
     fig.savefig(out_path, dpi=DPI, facecolor=OCEAN_COLOR, pad_inches=0)
     plt.close(fig)

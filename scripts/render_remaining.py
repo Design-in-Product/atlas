@@ -178,9 +178,9 @@ else:
         cam_lat = pf["camera_lat"]
         time_ma = pf["time_ma"]
 
-        rot_z = -math.radians(cam_lon) - math.pi / 2
-        rot_x = math.radians(cam_lat)
-        globe.rotation_euler = (rot_x, 0, rot_z)
+        rot_y = -math.radians(cam_lat)
+        rot_z = -math.radians(cam_lon)
+        globe.rotation_euler = (0, rot_y, rot_z)
 
         if geo_idx != prev_geo_idx:
             old_img = tex_image.image

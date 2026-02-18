@@ -23,7 +23,8 @@ import math
 # ── Configuration ──────────────────────────────────────────────
 FRAMES_DIR = os.path.abspath("./frames")
 CAMERA_PATH_FILE = os.path.abspath("./camera_path.json")
-OUTPUT_PATH = os.path.abspath("./tectonic_globe_v2.mp4")
+OUTPUT_PATH = os.path.abspath("./tectonic_globe_v6.mp4")
+CROSSFADE_HALF = 1  # frames from each side of transition = 2-frame crossfade window
 
 # Renderer: set to True for fast drafts, False for final quality
 USE_EEVEE = False
@@ -81,7 +82,7 @@ scene.render.fps = FPS
 
 # ── Renderer configuration ────────────────────────────────────
 if USE_EEVEE:
-    scene.render.engine = 'BLENDER_EEVEE_NEXT'
+    scene.render.engine = 'BLENDER_EEVEE'
     print("Renderer: EEVEE Next")
 else:
     scene.render.engine = 'CYCLES'
@@ -128,7 +129,9 @@ bpy.ops.object.shade_smooth()
 
 print(f"Globe: UV Sphere ({SPHERE_SEGMENTS}x{SPHERE_RINGS})")
 
-# ── Material: Image sequence texture ─────────────────────────
+# ── Material: Dual-texture crossfade shader ──────────────────
+# Two image texture nodes + Mix node for smooth transitions between
+# consecutive geological frames during the render loop.
 mat = bpy.data.materials.new(name="GlobeMaterial")
 try:
     mat.use_nodes = True
@@ -139,29 +142,52 @@ links = mat.node_tree.links
 nodes.clear()
 
 tex_coord = nodes.new('ShaderNodeTexCoord')
-tex_coord.location = (-600, 0)
+tex_coord.location = (-700, 0)
 
-tex_image = nodes.new('ShaderNodeTexImage')
-tex_image.location = (-300, 0)
+# Texture A (outgoing / primary)
+tex_image_a = nodes.new('ShaderNodeTexImage')
+tex_image_a.name = 'TexA'
+tex_image_a.location = (-400, 150)
+
+# Texture B (incoming / crossfade target)
+tex_image_b = nodes.new('ShaderNodeTexImage')
+tex_image_b.name = 'TexB'
+tex_image_b.location = (-400, -150)
+
+# Mix node for crossfade (RGBA mode)
+mix_node = nodes.new('ShaderNodeMix')
+mix_node.name = 'CrossfadeMix'
+mix_node.data_type = 'RGBA'
+mix_node.location = (-100, 0)
+mix_node.inputs[0].default_value = 0.0  # Factor: 0 = pure A, 1 = pure B
 
 bsdf = nodes.new('ShaderNodeBsdfPrincipled')
-bsdf.location = (0, 0)
+bsdf.location = (200, 0)
 bsdf.inputs['Roughness'].default_value = 0.85
 bsdf.inputs['Specular IOR Level'].default_value = 0.05
 
 output_node = nodes.new('ShaderNodeOutputMaterial')
-output_node.location = (300, 0)
+output_node.location = (500, 0)
 
-# Load initial texture (will be swapped per-frame during render)
+# Load initial texture into both slots
 img = bpy.data.images.load(frame_files[0])
-tex_image.image = img
+tex_image_a.image = img
+tex_image_b.image = img
 
-links.new(tex_coord.outputs['UV'], tex_image.inputs['Vector'])
-links.new(tex_image.outputs['Color'], bsdf.inputs['Base Color'])
+# Wire up: TexCoord → both textures → Mix → BSDF → Output
+links.new(tex_coord.outputs['UV'], tex_image_a.inputs['Vector'])
+links.new(tex_coord.outputs['UV'], tex_image_b.inputs['Vector'])
+links.new(tex_image_a.outputs['Color'], mix_node.inputs[6])   # A input
+links.new(tex_image_b.outputs['Color'], mix_node.inputs[7])   # B input
+links.new(mix_node.outputs[2], bsdf.inputs['Base Color'])     # Result output
 links.new(bsdf.outputs['BSDF'], output_node.inputs['Surface'])
 
 globe.data.materials.append(mat)
-print("Material: Single image texture (will swap per-frame during render)")
+print("Material: Dual-texture crossfade shader (Mix node for smooth transitions)")
+
+# Debug: print Mix node input/output indices for verification
+print(f"  Mix node inputs: {[(i, inp.name) for i, inp in enumerate(mix_node.inputs)]}")
+print(f"  Mix node outputs: {[(i, out.name) for i, out in enumerate(mix_node.outputs)]}")
 
 # Globe rotation will be set directly per-frame during render loop
 print("Globe rotation: will be set per-frame during render")
@@ -218,14 +244,53 @@ if bg_node:
 
 print("Background: Dark space")
 
+# ── Crossfade schedule computation ────────────────────────────
+def compute_crossfade_schedule(path_frames, crossfade_half=2):
+    """
+    Compute which animation frames need crossfading between geological textures.
+
+    Returns dict: anim_frame_index -> (geo_idx_a, geo_idx_b, alpha)
+    where alpha=0.0 means pure A and alpha=1.0 means pure B.
+    """
+    runs = []
+    prev_geo = path_frames[0]["geo_frame_idx"]
+    run_start = 0
+    for i, pf in enumerate(path_frames):
+        if pf["geo_frame_idx"] != prev_geo:
+            runs.append((prev_geo, run_start, i, i - run_start))
+            run_start = i
+            prev_geo = pf["geo_frame_idx"]
+    runs.append((prev_geo, run_start, len(path_frames), len(path_frames) - run_start))
+
+    crossfade_map = {}
+    for ri in range(len(runs) - 1):
+        out_run = runs[ri]
+        in_run = runs[ri + 1]
+        half = min(out_run[3] // 2, in_run[3] // 2, crossfade_half)
+        if half < 1:
+            continue
+        window = 2 * half
+        transition = in_run[1]
+        for k in range(window):
+            anim_idx = transition - half + k
+            alpha = (k + 1) / (window + 1)
+            crossfade_map[anim_idx] = (out_run[0], in_run[0], alpha)
+
+    return crossfade_map
+
+crossfade_map = compute_crossfade_schedule(path_frames, CROSSFADE_HALF)
+
 # ── Per-frame render loop ─────────────────────────────────────
 # Blender's image sequence frame_offset keyframing is broken in 5.0.
 # Instead, we explicitly load the correct texture and set globe rotation
 # for each frame, then render individually.
+# Crossfade: at transition boundaries, both texture slots are loaded
+# and the Mix node blends between them.
 duration_sec = total_anim_frames / FPS
 print(f"\n{'='*60}")
 print(f"Starting per-frame render: {total_anim_frames} frames at {RES_X}x{RES_Y}")
 print(f"Duration: {duration_sec:.1f}s at {FPS}fps")
+print(f"Crossfade frames: {len(crossfade_map)} (across {geo_frame_count - 1} transitions)")
 print(f"Render dir: {RENDER_DIR}")
 print(f"{'='*60}\n")
 
@@ -233,7 +298,8 @@ import subprocess
 import time
 
 render_start = time.time()
-prev_geo_idx = -1
+prev_geo_a = -1
+prev_geo_b = -1
 
 for i, pf in enumerate(path_frames):
     anim_f = pf["anim_frame"] + 1  # Blender 1-indexed
@@ -243,22 +309,49 @@ for i, pf in enumerate(path_frames):
     time_ma = pf["time_ma"]
 
     # Set globe rotation so cam_lon/cam_lat faces the camera
-    rot_z = -math.radians(cam_lon) - math.pi / 2
-    rot_x = math.radians(cam_lat)
-    globe.rotation_euler = (rot_x, 0, rot_z)
+    # Y-axis tilt for latitude, Z-axis spin for longitude
+    rot_y = -math.radians(cam_lat)
+    rot_z = -math.radians(cam_lon)
+    globe.rotation_euler = (0, rot_y, rot_z)
 
-    # Swap texture only when geological frame changes (saves I/O)
-    if geo_idx != prev_geo_idx:
-        old_img = tex_image.image
-        new_img = bpy.data.images.load(frame_files[geo_idx], check_existing=True)
-        tex_image.image = new_img
-        # Free old image to prevent memory bloat
-        if old_img and old_img != new_img:
-            bpy.data.images.remove(old_img)
-        prev_geo_idx = geo_idx
+    if i in crossfade_map:
+        # ── Crossfade frame: blend two textures ──
+        geo_a, geo_b, alpha = crossfade_map[i]
+
+        # Load texture A (outgoing) if changed
+        if geo_a != prev_geo_a:
+            old_a = tex_image_a.image
+            new_a = bpy.data.images.load(frame_files[geo_a], check_existing=True)
+            tex_image_a.image = new_a
+            if old_a and old_a != new_a and old_a != tex_image_b.image:
+                bpy.data.images.remove(old_a)
+            prev_geo_a = geo_a
+
+        # Load texture B (incoming) if changed
+        if geo_b != prev_geo_b:
+            old_b = tex_image_b.image
+            new_b = bpy.data.images.load(frame_files[geo_b], check_existing=True)
+            tex_image_b.image = new_b
+            if old_b and old_b != new_b and old_b != tex_image_a.image:
+                bpy.data.images.remove(old_b)
+            prev_geo_b = geo_b
+
+        # Set crossfade factor
+        mix_node.inputs[0].default_value = alpha
+    else:
+        # ── Normal frame: single texture, no crossfade ──
+        if geo_idx != prev_geo_a:
+            old_a = tex_image_a.image
+            new_a = bpy.data.images.load(frame_files[geo_idx], check_existing=True)
+            tex_image_a.image = new_a
+            if old_a and old_a != new_a and old_a != tex_image_b.image:
+                bpy.data.images.remove(old_a)
+            prev_geo_a = geo_idx
+
+        # Pure texture A (no crossfade)
+        mix_node.inputs[0].default_value = 0.0
 
     # Render this frame
-    # Note: Blender appends the file extension automatically
     scene.frame_set(anim_f)
     scene.render.filepath = os.path.join(RENDER_DIR, f"render_{anim_f:04d}")
     bpy.ops.render.render(write_still=True)
@@ -267,7 +360,8 @@ for i, pf in enumerate(path_frames):
     elapsed = time.time() - render_start
     fps_rate = (i + 1) / elapsed if elapsed > 0 else 0
     eta = (total_anim_frames - i - 1) / fps_rate if fps_rate > 0 else 0
-    print(f"  [{i+1}/{total_anim_frames}] Frame {anim_f}: {time_ma:.0f} Ma (geo #{geo_idx}) "
+    blend_str = f" [blend {alpha:.1f}]" if i in crossfade_map else ""
+    print(f"  [{i+1}/{total_anim_frames}] Frame {anim_f}: {time_ma:.0f} Ma (geo #{geo_idx}){blend_str} "
           f"— {fps_rate:.2f} fps, ETA {eta:.0f}s")
 
 render_elapsed = time.time() - render_start
@@ -290,8 +384,8 @@ PlayResY: 1080
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: TimeLabel,Arial,48,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3,0,1,40,40,40,1
-Style: EraLabel,Arial,32,&H00CCCCCC,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,0,1,40,40,80,1
+Style: TimeLabel,Arial,48,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3,0,1,40,40,35,1
+Style: EraLabel,Arial,32,&H00CCCCCC,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,0,1,40,40,95,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

@@ -28,10 +28,10 @@ OUTPUT_PATH = os.path.join(PROJECT_ROOT, "camera_path.json")
 
 TIME_START = 1000  # Ma
 TIME_END = 0       # Ma
-TIME_STEP = 5      # Ma
+TIME_STEP = 1      # Ma
 
 # Smoothing: sigma in units of frames (larger = smoother camera motion)
-SMOOTH_SIGMA = 8  # ~40 Ma smoothing window
+SMOOTH_SIGMA = 60  # ~60 Ma smoothing window (60 frames × 1 Ma = 60 Ma)
 
 # ── Load plate model ──────────────────────────────────────────
 print("Loading Merdith2021 plate model...")
@@ -60,8 +60,9 @@ raw_lons = []
 raw_lats = []
 land_areas = []  # Total land area (used for dispersal metric)
 
-# Clustering threshold: polygons closer than this are part of the same landmass
-CLUSTER_DISTANCE_DEG = 10.0  # degrees on great circle
+# Adaptive clustering: escalate threshold until largest cluster covers enough land
+CLUSTER_THRESHOLDS = [12, 18, 25]  # degrees on great circle, tried in order
+MIN_CLUSTER_COVERAGE = 0.50         # stop escalating when largest cluster >= 50% of land
 
 def haversine_deg(lat1, lon1, lat2, lon2):
     """Angular distance in degrees between two points on sphere."""
@@ -90,7 +91,7 @@ def union(parent, rank, a, b):
         rank[ra] += 1
 
 print(f"\nComputing largest-landmass centroids for {total_steps} timesteps...")
-print(f"  Clustering threshold: {CLUSTER_DISTANCE_DEG}° great circle distance")
+print(f"  Adaptive clustering thresholds: {CLUSTER_THRESHOLDS}° (min coverage: {MIN_CLUSTER_COVERAGE*100:.0f}%)")
 
 for i, time_ma in enumerate(times):
     reconstructed = []
@@ -145,30 +146,44 @@ for i, time_ma in enumerate(times):
         raw_lats.append(raw_lats[-1] if raw_lats else 0.0)
         continue
 
-    # Cluster polygons by proximity using Union-Find
+    # Cluster polygons by proximity using Union-Find with adaptive threshold
+    from collections import defaultdict
     n = len(poly_data)
-    parent = list(range(n))
-    rank = [0] * n
 
+    # Pre-compute pairwise distances (O(n^2) but n is typically < 500)
+    pairwise_dist = {}
     for a_idx in range(n):
         for b_idx in range(a_idx + 1, n):
-            dist = haversine_deg(
+            pairwise_dist[(a_idx, b_idx)] = haversine_deg(
                 poly_data[a_idx]['lat'], poly_data[a_idx]['lon'],
                 poly_data[b_idx]['lat'], poly_data[b_idx]['lon']
             )
-            if dist < CLUSTER_DISTANCE_DEG:
-                union(parent, rank, a_idx, b_idx)
 
-    # Group polygons by cluster and find the largest
-    from collections import defaultdict
-    clusters = defaultdict(list)
-    for idx in range(n):
-        root = find_root(parent, idx)
-        clusters[root].append(idx)
+    best_cluster = None
+    used_threshold = CLUSTER_THRESHOLDS[-1]
 
-    # Find cluster with largest total area
-    best_cluster = max(clusters.values(),
-                       key=lambda idxs: sum(poly_data[j]['area'] for j in idxs))
+    for threshold in CLUSTER_THRESHOLDS:
+        parent = list(range(n))
+        rank_arr = [0] * n
+
+        for (a_idx, b_idx), dist in pairwise_dist.items():
+            if dist < threshold:
+                union(parent, rank_arr, a_idx, b_idx)
+
+        clusters = defaultdict(list)
+        for idx in range(n):
+            root = find_root(parent, idx)
+            clusters[root].append(idx)
+
+        candidate = max(clusters.values(),
+                        key=lambda idxs: sum(poly_data[j]['area'] for j in idxs))
+        candidate_area = sum(poly_data[j]['area'] for j in candidate)
+        coverage = candidate_area / total_area if total_area > 0 else 0
+
+        best_cluster = candidate
+        used_threshold = threshold
+        if coverage >= MIN_CLUSTER_COVERAGE:
+            break  # Good enough coverage at this threshold
 
     # Compute area-weighted centroid of the largest cluster (in Cartesian)
     cx, cy, cz, carea = 0.0, 0.0, 0.0, 0.0
@@ -193,7 +208,7 @@ for i, time_ma in enumerate(times):
         cluster_area_pct = carea / total_area * 100 if total_area > 0 else 0
         print(f"  [{i+1:3d}/{total_steps}] {int(time_ma):4d} Ma  "
               f"largest landmass: ({centroid_lat:+6.1f}°, {centroid_lon:+7.1f}°) "
-              f"[{len(best_cluster)} polys, {cluster_area_pct:.0f}% of land]")
+              f"[{len(best_cluster)} polys, {cluster_area_pct:.0f}% of land, thresh={used_threshold}°]")
 
 raw_lons = np.array(raw_lons)
 raw_lats = np.array(raw_lats)
@@ -264,20 +279,21 @@ print("\nApplying era-based overrides...")
 ERA_OVERRIDES = [
     # (time_ma, target_lon, target_lat, label, weight)
     # weight: 0 = use computed centroid, 1 = fully override to target
-    (1000, None, None, "Rodinia assembling", 0.0),       # Trust centroid
-    (900,  None, None, "Rodinia assembled", 0.0),         # Trust centroid
-    (750,  None, None, "Rodinia breaking up", 0.0),       # Trust centroid
-    (550,   20, -30, "Gondwana assembling", 0.6),         # Guide toward south
-    (450,   20, -40, "Gondwana assembled", 0.5),          # Gondwana in south
-    (350,    0, -20, "Pangaea assembling", 0.5),          # Drift to Pangaea center
-    (300,    0,  10, "Pangaea coalescing", 0.6),          # Center on Pangaea
-    (250,    0,  10, "Pangaea assembled", 0.7),           # Pangaea fully formed
-    (200,   20,  15, "Pangaea breaking up", 0.5),         # Central Atlantic opens
-    (150,   20,  10, "Fragments dispersing", 0.3),        # Indian Ocean opens
-    (100,   10,  10, "Continents separating", 0.2),       # Let centroid lead
-    (66,     0,  10, "K-Pg extinction", 0.2),             # Brief geological moment
-    (50,     0,  20, "Modern arrangement forming", 0.1),  # Trust centroid
-    (0,     20,  20, "Present day", 0.3),                 # Familiar Atlantic view
+    (1000, None, None, "Rodinia assembling", 0.0),        # Trust centroid
+    (900,  None, None, "Rodinia assembled", 0.0),          # Trust centroid
+    (750,  None, None, "Rodinia breaking up", 0.0),        # Trust centroid
+    (550,  100, -45, "Gondwana assembling", 0.5),          # Guide toward Gondwana core
+    (480,  120, -50, "Gondwana assembled", 0.5),           # Center on Australia/India cluster
+    (380,    5, -15, "Laurussia forming", 0.4),            # Northern continents merge
+    (350,    0, -10, "Pangaea assembling", 0.5),           # Drift to Pangaea center
+    (300,    0,  10, "Pangaea coalescing", 0.6),           # Center on Pangaea
+    (250,    0,  10, "Pangaea assembled", 0.7),            # Pangaea fully formed
+    (200,   20,  15, "Pangaea breaking up", 0.5),          # Central Atlantic opens
+    (150,   20,  10, "Atlantic Ocean opening", 0.3),       # Indian Ocean opens too
+    (100,   10,  10, "India racing north", 0.2),           # Let centroid lead
+    (66,     0,  10, "K-Pg extinction", 0.2),              # Brief geological moment
+    (50,     0,  20, "Modern world forming", 0.1),         # Trust centroid
+    (0,     15,  25, "Present day", 0.4),                  # Centered on Europe/Africa
 ]
 
 # Interpolate era overrides to each timestep
@@ -347,18 +363,18 @@ smooth_dispersal = gaussian_filter1d(dispersal_norm, sigma=SMOOTH_SIGMA)
 
 # Frame duration multiplier: low dispersal → longer, high dispersal → shorter
 # Targeting ~45-60s total video duration
-MIN_SPEED = 1.5   # Fastest: 1.5 frames per timestep (during max dispersal)
-MAX_SPEED = 4.0   # Slowest: 4 frames per timestep (during supercontinents)
+MIN_SPEED = 1.0   # Fastest: 1 frame per timestep (during max dispersal)
+MAX_SPEED = 3.0   # Slowest: 3 frames per timestep (during supercontinents)
 
 frame_duration = MIN_SPEED + (MAX_SPEED - MIN_SPEED) * (1.0 - smooth_dispersal)
 
 # Also add extra hold time at key supercontinents
 SUPERCONTINENT_HOLD = [
     # (time_ma, extra_hold_frames, label)
-    (900, 72, "Rodinia peak"),      # 3s pause at Rodinia
-    (450, 48, "Gondwana peak"),     # 2s pause at Gondwana
-    (250, 96, "Pangaea peak"),      # 4s pause at Pangaea
-    (0, 72, "Present day"),         # 3s pause at present
+    (900, 48, "Rodinia peak"),       # 2s pause at Rodinia
+    (480, 36, "Gondwana peak"),     # 1.5s pause at Gondwana
+    (250, 60, "Pangaea peak"),      # 2.5s pause at Pangaea
+    (0, 60, "Present day"),         # 2.5s pause at present
 ]
 
 # Convert to frame indices and add hold
