@@ -1,4 +1,4 @@
-# Tectonic Globe
+# Atlas: Animated Tectonic Globe
 
 A 3D animated visualization of Earth's tectonic history, showing continental drift from 1000 million years ago (Rodinia) through Pangaea to the present day.
 
@@ -47,9 +47,9 @@ python3 scripts/render_flat.py
 
 ## How This Was Built
 
-I'm Claude (Anthropic's AI assistant), and I built this project collaboratively with @mediajunkie (xian) over a series of working sessions in February 2025. I think the process is worth documenting because it's a good example of how iterative human-AI collaboration can work on a creative technical project.
+I'm Claude (Anthropic's AI assistant), and I built this project collaboratively with Xian over a series of working sessions in February 2025. I think the process is worth documenting because it's a good example of how iterative human-AI collaboration can work on a creative technical project.
 
-**The starting point** was xian's idea: visualize a billion years of tectonic plate movement as a rotating 3D globe animation. He had the vision and the domain curiosity; I had the ability to write and debug code quickly across a stack that spans Python geoscience libraries, Blender's 3D API, video encoding, and subtitle rendering.
+**The starting point** was Xian's idea: visualize a billion years of tectonic plate movement as a rotating 3D globe animation. He had the vision and the domain curiosity; I had the ability to write and debug code quickly across a stack that spans Python geoscience libraries, Blender's 3D API, video encoding, and subtitle rendering.
 
 **We built it in six versions over four days**, each one a meaningful improvement:
 
@@ -69,7 +69,7 @@ I'm Claude (Anthropic's AI assistant), and I built this project collaboratively 
 
 The hardest bugs were geometric, not algorithmic. Getting rotations right in 3D (which axis? which sign? radians or degrees?) ate more debugging time than any of the clustering or pacing logic. And the most impactful improvement wasn't a clever algorithm — it was just generating more data. The jump from 5 Ma to 1 Ma resolution was a one-line change (`TIME_STEP = 1`) that transformed the entire feel of the animation.
 
-xian's role was essential in ways that go beyond "having the idea." He watched every version, caught visual bugs I couldn't see (I can look at individual frames but can't watch video in motion), prioritized ruthlessly (the backlog grew to 11 items; we did the right 3 first), and made good calls on scope (targeting ~2 minutes instead of letting it balloon to 5).
+Xian's role was essential in ways that go beyond "having the idea." He watched every version, caught visual bugs I couldn't see (I can look at individual frames but can't watch video in motion), prioritized ruthlessly (the backlog grew to 11 items; we did the right 3 first), and made good calls on scope (targeting ~2 minutes instead of letting it balloon to 5).
 
 The project isn't done — there's a wishlist that includes extending deeper into the past, projecting into the future, visual polish, and an interactive WebGL viewer. But v6 is the version that's worth sharing, and it got there through a process of building, watching, fixing, and building again.
 
