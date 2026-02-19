@@ -1,0 +1,379 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; color: #e0e0e0; overflow: hidden; height: 100vh; }
+
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+/* ============================================================
+   MAIN — map fills all space above timeline
+   ============================================================ */
+
+#main { flex: 1; position: relative; min-height: 0; }
+#map { width: 100%; height: 100%; background: #0a0a1a; }
+
+/* ============================================================
+   FLOATING TITLE — translucent pill over top-left of map
+   ============================================================ */
+
+#map-title {
+  position: absolute;
+  top: 12px;
+  left: 56px; /* clear Leaflet zoom controls */
+  z-index: 500;
+  background: rgba(22, 33, 62, 0.85);
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(15, 52, 96, 0.6);
+  pointer-events: none;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.title-text {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  color: #e0e0e0;
+}
+.title-region {
+  font-size: 11px;
+  color: #888;
+}
+
+/* ============================================================
+   LAYERS PANEL — slides in from left
+   ============================================================ */
+
+#layers-panel {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 300px;
+  background: #16213e;
+  border-right: 1px solid #0f3460;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  box-shadow: none;
+}
+#layers-panel.open {
+  transform: translateX(0);
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.5);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid #0f3460;
+  flex-shrink: 0;
+}
+.panel-header h2 {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #aaa;
+  margin: 0;
+}
+
+#layers-panel-close {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 24px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+  transition: color 0.2s;
+}
+#layers-panel-close:hover { color: #e94560; }
+
+.panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* ============================================================
+   FLOATING LAYERS BUTTON
+   ============================================================ */
+
+#layers-toggle {
+  position: fixed;
+  bottom: 100px;
+  left: 14px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #e94560;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  z-index: 1000;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.25s, transform 0.2s;
+}
+#layers-toggle:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 16px rgba(233, 69, 96, 0.4);
+}
+#layers-toggle.panel-open {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ============================================================
+   LAYER CONTROLS (inside panel)
+   ============================================================ */
+
+.layer-group { margin-bottom: 16px; }
+.layer-group label { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; margin-bottom: 6px; }
+.layer-group input[type="checkbox"] { accent-color: #e94560; }
+.layer-group input[type="range"] { width: 100%; accent-color: #e94560; height: 4px; }
+.layer-group .range-label { font-size: 11px; color: #666; display: flex; justify-content: space-between; }
+.layer-disabled { opacity: 0.4; }
+.layer-disabled input { pointer-events: none; }
+.layer-reference { opacity: 0.7; font-size: 0.9em; }
+
+/* ============================================================
+   LEGENDS (inside panel)
+   ============================================================ */
+
+.panel-legends { margin-top: 12px; border-top: 1px solid #0f3460; padding-top: 12px; }
+
+#political-legend, #religion-legend, #language-legend, #trade-legend { margin-bottom: 16px; }
+#political-legend h3, #religion-legend h3, #language-legend h3, #trade-legend h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 12px; }
+.legend-color { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.2); flex-shrink: 0; }
+.legend-line { width: 24px; flex-shrink: 0; text-align: center; font-size: 14px; line-height: 1; }
+
+/* ============================================================
+   TIMELINE — compact, responsive
+   ============================================================ */
+
+#timeline {
+  background: #16213e;
+  border-top: 1px solid #0f3460;
+  padding: 8px 16px;
+  flex-shrink: 0;
+}
+
+#timeline-top { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+
+.timeline-btn {
+  background: #0f3460;
+  border: 1px solid #e94560;
+  color: #e94560;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.timeline-btn:hover { background: #e94560; color: #fff; }
+.timeline-btn.active { background: #e94560; color: #fff; }
+
+#speed-controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+#speed-controls label { font-size: 11px; color: #888; }
+#speed-controls select {
+  background: #0f3460;
+  color: #e0e0e0;
+  border: 1px solid #333;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+#date-display {
+  font-size: 20px;
+  font-weight: 600;
+  color: #e94560;
+  min-width: 120px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+#timeline-context {
+  font-size: 11px;
+  color: #888;
+  flex: 1;
+  text-align: right;
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#slider-container { position: relative; }
+#timeline-slider {
+  width: 100%;
+  height: 6px;
+  accent-color: #e94560;
+  cursor: pointer;
+}
+#keyframe-markers {
+  position: relative;
+  height: 12px;
+  margin-top: 2px;
+}
+.keyframe-tick {
+  position: absolute;
+  width: 2px;
+  height: 8px;
+  background: #e94560;
+  opacity: 0.6;
+  transform: translateX(-50%);
+}
+.keyframe-label {
+  position: absolute;
+  font-size: 9px;
+  color: #666;
+  transform: translateX(-50%);
+  top: 8px;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   LEAFLET OVERRIDES
+   ============================================================ */
+
+.leaflet-container { background: #1a1a2e !important; }
+.leaflet-tile-pane { filter: saturate(0) brightness(0.75) contrast(0.85); }
+.leaflet-control-attribution { font-size: 9px !important; background: rgba(22,33,62,0.8) !important; color: #666 !important; }
+.leaflet-control-attribution a { color: #888 !important; }
+.leaflet-control-zoom a { background: #16213e !important; color: #e0e0e0 !important; border-color: #0f3460 !important; }
+
+.empire-tooltip {
+  background: rgba(22,33,62,0.95) !important;
+  border: 1px solid #e94560 !important;
+  color: #e0e0e0 !important;
+  font-size: 13px !important;
+  padding: 6px 10px !important;
+  border-radius: 4px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+}
+.empire-tooltip .leaflet-tooltip-arrow { display: none; }
+
+.leaflet-popup-content-wrapper {
+  background: rgba(22,33,62,0.95) !important;
+  color: #e0e0e0 !important;
+  border: 1px solid #0f3460 !important;
+  border-radius: 6px !important;
+}
+.leaflet-popup-tip { background: rgba(22,33,62,0.95) !important; }
+.leaflet-popup-close-button { color: #888 !important; }
+.popup-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.popup-desc { font-size: 12px; color: #aaa; line-height: 1.4; }
+
+/* ============================================================
+   MAP LABELS
+   ============================================================ */
+
+.empire-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: -1px -1px 0 rgba(0,0,0,0.7), 1px -1px 0 rgba(0,0,0,0.7),
+               -1px 1px 0 rgba(0,0,0,0.7), 1px 1px 0 rgba(0,0,0,0.7),
+               0 0 6px rgba(0,0,0,0.5);
+  letter-spacing: 0.5px;
+  transition: opacity 0.3s;
+}
+.empire-label.large { font-size: 15px; letter-spacing: 2px; }
+.empire-label.medium { font-size: 12px; letter-spacing: 1px; }
+.empire-label.small { font-size: 10px; letter-spacing: 0.5px; }
+
+.religion-label {
+  font-size: 11px;
+  font-weight: 400;
+  font-style: italic;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: -1px -1px 0 rgba(0,0,0,0.8), 1px -1px 0 rgba(0,0,0,0.8),
+               -1px 1px 0 rgba(0,0,0,0.8), 1px 1px 0 rgba(0,0,0,0.8),
+               0 0 6px rgba(0,0,0,0.6);
+  letter-spacing: 1px;
+  transition: opacity 0.3s;
+}
+.religion-label.large { font-size: 14px; letter-spacing: 3px; }
+.religion-label.medium { font-size: 11px; letter-spacing: 2px; }
+.religion-label.small { font-size: 9px; letter-spacing: 1px; }
+
+.language-label {
+  font-size: 11px;
+  font-weight: 500;
+  font-variant: small-caps;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: -1px -1px 0 rgba(0,0,0,0.8), 1px -1px 0 rgba(0,0,0,0.8),
+               -1px 1px 0 rgba(0,0,0,0.8), 1px 1px 0 rgba(0,0,0,0.8),
+               0 0 6px rgba(0,0,0,0.6);
+  letter-spacing: 1.5px;
+  transition: opacity 0.3s;
+}
+.language-label.large { font-size: 14px; letter-spacing: 3px; }
+.language-label.medium { font-size: 11px; letter-spacing: 2px; }
+.language-label.small { font-size: 9px; letter-spacing: 1px; }
+
+.trade-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: -1px -1px 0 rgba(0,0,0,0.9), 1px -1px 0 rgba(0,0,0,0.9),
+               -1px 1px 0 rgba(0,0,0,0.9), 1px 1px 0 rgba(0,0,0,0.9),
+               0 0 8px rgba(0,0,0,0.7);
+  letter-spacing: 0.5px;
+  transition: opacity 0.3s;
+}
+
+/* ============================================================
+   RESPONSIVE — mobile & landscape phones
+   ============================================================ */
+
+@media (max-width: 600px) {
+  #map-title { left: 12px; top: 8px; }
+  .title-region { display: none; }
+  #layers-panel { width: 85vw; max-width: 300px; }
+  #layers-toggle { bottom: 80px; left: 10px; width: 40px; height: 40px; }
+  #date-display { font-size: 16px; min-width: 100px; }
+  #timeline-context { display: none; }
+  #timeline { padding: 6px 10px; }
+  #timeline-top { gap: 8px; }
+}
+
+@media (max-height: 500px) {
+  /* landscape phone */
+  #timeline { padding: 4px 12px; }
+  #timeline-top { margin-bottom: 2px; gap: 8px; }
+  .timeline-btn { width: 28px; height: 28px; font-size: 10px; }
+  #date-display { font-size: 16px; min-width: 90px; }
+  #speed-controls label { display: none; }
+  #keyframe-markers { height: 8px; }
+  .keyframe-label { display: none; }
+  #layers-toggle { bottom: 60px; }
+}

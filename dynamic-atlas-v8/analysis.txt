@@ -1,0 +1,13 @@
+CROSS-REFERENCE ANALYSIS - Dynamic Atlas v7
+============================================
+
+LOAD ORDER:
+1. keyframes.js - defines KEYFRAMES
+2. transitions.js - defines ENTITY_TRANSITIONS
+3. religion-keyframes.js - defines RELIGION_KEYFRAMES
+4. main.js - defines map, global state variables
+5. renderer.js - defines rendering functions
+6. morphing.js - defines morphing engine functions
+7. timeline.js - defines timeline controls
+8. controls.js - defines layer controls + initialization
+
