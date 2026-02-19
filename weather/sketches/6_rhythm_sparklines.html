@@ -4,21 +4,51 @@
 <meta charset="utf-8">
 <title>Sketch 6 — Rain Rhythm Sparklines</title>
 <style>
+  :root {
+    --bg: #0a0e17;
+    --bg-card: #0f1923;
+    --text: #c8d6e5;
+    --text-bold: #fff;
+    --muted: #5f7d9a;
+    --dim: #3d566e;
+    --border: #1a2332;
+    --accent: #34c6c6;
+    --accent-light: #6ee7e7;
+    --accent-dark: #0e5a6f;
+    --tooltip-bg: #1a2332;
+    --tooltip-border: #2d4055;
+    --shadow: rgba(0,0,0,0.5);
+  }
+  body.light {
+    --bg: #f5f7fa;
+    --bg-card: #ffffff;
+    --text: #2d3748;
+    --text-bold: #1a202c;
+    --muted: #64748b;
+    --dim: #94a3b8;
+    --border: #e2e8f0;
+    --accent: #0891b2;
+    --accent-light: #06b6d4;
+    --accent-dark: #164e63;
+    --tooltip-bg: #ffffff;
+    --tooltip-border: #e2e8f0;
+    --shadow: rgba(0,0,0,0.1);
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'SF Mono', 'Menlo', monospace; background: #0a0e17; color: #c8d6e5; padding: 32px; }
-  h1 { font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #5f7d9a; margin-bottom: 4px; }
-  .subtitle { font-size: 11px; color: #3d566e; margin-bottom: 28px; }
+  body { font-family: 'SF Mono', 'Menlo', monospace; background: var(--bg); color: var(--text); padding: 32px; }
+  h1 { font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 4px; }
+  .subtitle { font-size: 11px; color: var(--dim); margin-bottom: 28px; }
   .row { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
-  .month-label { width: 80px; font-size: 12px; color: #5f7d9a; text-align: right; }
+  .month-label { width: 80px; font-size: 12px; color: var(--muted); text-align: right; }
   .sparkline { flex: 1; height: 48px; position: relative; cursor: crosshair; }
   .spark-canvas { width: 100%; height: 100%; }
-  .month-total { width: 64px; font-size: 13px; font-weight: bold; color: #34c6c6; text-align: right; }
-  .month-days { width: 50px; font-size: 10px; color: #3d566e; }
-  .annotation { margin-top: 24px; padding: 16px; background: #0f1923; border-radius: 8px; border: 1px solid #1a2332; }
-  .annotation h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #5f7d9a; margin-bottom: 8px; }
+  .month-total { width: 64px; font-size: 13px; font-weight: bold; color: var(--accent); text-align: right; }
+  .month-days { width: 50px; font-size: 10px; color: var(--dim); }
+  .annotation { margin-top: 24px; padding: 16px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); }
+  .annotation h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
   .annotation p { font-size: 12px; line-height: 1.6; color: #8a9bb5; }
-  .annotation strong { color: #34c6c6; }
-  .tooltip { position: fixed; background: #1a2332; border: 1px solid #2d4055; padding: 6px 10px;
+  .annotation strong { color: var(--accent); }
+  .tooltip { position: fixed; background: var(--tooltip-bg); border: 1px solid var(--tooltip-border); padding: 6px 10px;
              border-radius: 4px; font-size: 10px; pointer-events: none; z-index: 10; display: none; }
 </style>
 </head>
@@ -46,60 +76,116 @@ const globalMax = Math.max(...Object.values(DATA));
 const container = document.getElementById('rows');
 const tip = document.getElementById('tip');
 
-months.forEach(m => {
-  const row = document.createElement('div');
-  row.className = 'row';
+const isLight = () => document.body.classList.contains('light');
 
-  // Gather month data
-  const vals = [];
-  let total = 0, rainDays = 0;
-  for (let d = 1; d <= m.days; d++) {
-    const key = m.key + '-' + String(d).padStart(2, '0');
-    const v = DATA[key] ?? null;
-    vals.push({ day: d, key, val: v });
-    if (v !== null) { total += v; if (v > 0) rainDays++; }
-  }
+// Store references for redraw
+const canvasData = [];
 
-  const canvas = document.createElement('canvas');
-  canvas.className = 'spark-canvas';
-  canvas.width = 500;
-  canvas.height = 48;
-  const ctx = canvas.getContext('2d');
+function buildRows() {
+  container.innerHTML = '';
+  canvasData.length = 0;
 
-  const barW = (500 / m.days) - 1;
-  vals.forEach((v, i) => {
-    if (v.val === null || v.val === 0) return;
-    const h = (v.val / globalMax) * 40;
-    const x = i * (500 / m.days);
-    const gradient = ctx.createLinearGradient(0, 48 - h, 0, 48);
-    gradient.addColorStop(0, '#6ee7e7');
-    gradient.addColorStop(1, '#0e5a6f');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(x, 48 - h, Math.max(barW, 2), h);
+  months.forEach(m => {
+    const row = document.createElement('div');
+    row.className = 'row';
+
+    // Gather month data
+    const vals = [];
+    let total = 0, rainDays = 0;
+    for (let d = 1; d <= m.days; d++) {
+      const key = m.key + '-' + String(d).padStart(2, '0');
+      const v = DATA[key] ?? null;
+      vals.push({ day: d, key, val: v });
+      if (v !== null) { total += v; if (v > 0) rainDays++; }
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.className = 'spark-canvas';
+    canvas.width = 500;
+    canvas.height = 48;
+
+    canvasData.push({ canvas, vals, m });
+
+    // Hover
+    const sparkDiv = document.createElement('div');
+    sparkDiv.className = 'sparkline';
+    sparkDiv.appendChild(canvas);
+    sparkDiv.addEventListener('mousemove', e => {
+      const rect = sparkDiv.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const dayIdx = Math.floor(x / rect.width * m.days);
+      const v = vals[dayIdx];
+      if (!v) { tip.style.display = 'none'; return; }
+      const mutedColor = isLight() ? '#64748b' : '#5f7d9a';
+      const accentColor = isLight() ? '#06b6d4' : '#6ee7e7';
+      tip.innerHTML = `<span style="color:${mutedColor}">${v.key}</span> <span style="color:${accentColor};font-weight:bold">${v.val !== null ? v.val.toFixed(2) + '"' : 'N/A'}</span>`;
+      tip.style.display = 'block';
+      tip.style.left = e.clientX + 12 + 'px';
+      tip.style.top = e.clientY - 24 + 'px';
+    });
+    sparkDiv.addEventListener('mouseleave', () => tip.style.display = 'none');
+
+    const label = document.createElement('div');
+    label.className = 'month-label';
+    label.textContent = m.name;
+
+    const totalEl = document.createElement('div');
+    totalEl.className = 'month-total';
+    totalEl.textContent = total.toFixed(2) + '"';
+
+    const daysEl = document.createElement('div');
+    daysEl.className = 'month-days';
+    daysEl.textContent = rainDays + ' days';
+
+    row.appendChild(label);
+    row.appendChild(sparkDiv);
+    row.appendChild(totalEl);
+    row.appendChild(daysEl);
+    container.appendChild(row);
   });
+}
 
-  // Hover
-  const sparkDiv = document.createElement('div');
-  sparkDiv.className = 'sparkline';
-  sparkDiv.appendChild(canvas);
-  sparkDiv.addEventListener('mousemove', e => {
-    const rect = sparkDiv.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const dayIdx = Math.floor(x / rect.width * m.days);
-    const v = vals[dayIdx];
-    if (!v) { tip.style.display = 'none'; return; }
-    tip.innerHTML = `<span style="color:#5f7d9a">${v.key}</span> <span style="color:#6ee7e7;font-weight:bold">${v.val !== null ? v.val.toFixed(2) + '"' : 'N/A'}</span>`;
-    tip.style.display = 'block';
-    tip.style.left = e.clientX + 12 + 'px';
-    tip.style.top = e.clientY - 24 + 'px';
+function drawCanvases() {
+  const gradTop = isLight() ? '#06b6d4' : '#6ee7e7';
+  const gradBot = isLight() ? '#b2e2e8' : '#0e5a6f';
+
+  canvasData.forEach(({ canvas, vals, m }) => {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 500, 48);
+    const barW = (500 / m.days) - 1;
+    vals.forEach((v, i) => {
+      if (v.val === null || v.val === 0) return;
+      const h = (v.val / globalMax) * 40;
+      const x = i * (500 / m.days);
+      const gradient = ctx.createLinearGradient(0, 48 - h, 0, 48);
+      gradient.addColorStop(0, gradTop);
+      gradient.addColorStop(1, gradBot);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(x, 48 - h, Math.max(barW, 2), h);
+    });
   });
-  sparkDiv.addEventListener('mouseleave', () => tip.style.display = 'none');
+}
 
-  row.innerHTML = `<div class="month-label">${m.name}</div>`;
-  row.appendChild(sparkDiv);
-  row.innerHTML += `<div class="month-total">${total.toFixed(2)}"</div><div class="month-days">${rainDays} days</div>`;
-  container.appendChild(row);
-});
+function renderAll() {
+  buildRows();
+  drawCanvases();
+}
+
+renderAll();
+</script>
+<button id="themeToggle" style="position:fixed;top:12px;right:12px;background:var(--bg-card);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;font:10px/1 monospace;cursor:pointer;z-index:100">Light</button>
+<script>
+(function(){
+  const btn = document.getElementById('themeToggle');
+  if(new URLSearchParams(location.search).has('light')){document.body.classList.add('light');btn.textContent='Dark'}
+  btn.addEventListener('click', () => {
+    document.body.classList.toggle('light');
+    btn.textContent = document.body.classList.contains('light') ? 'Dark' : 'Light';
+    renderAll();
+  });
+  // Re-render if started in light mode
+  if(document.body.classList.contains('light')) renderAll();
+})();
 </script>
 </body>
 </html>

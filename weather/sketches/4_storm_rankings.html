@@ -4,26 +4,50 @@
 <meta charset="utf-8">
 <title>Sketch 4 — Storm Power Rankings</title>
 <style>
+  :root {
+    --bg: #0a0e17;
+    --bg-card: #0f1923;
+    --text: #c8d6e5;
+    --text-bold: #fff;
+    --muted: #5f7d9a;
+    --dim: #3d566e;
+    --border: #1a2332;
+    --accent: #34c6c6;
+    --shadow: rgba(0,0,0,0.5);
+    --silver: #a0b0c0;
+  }
+  body.light {
+    --bg: #f5f7fa;
+    --bg-card: #ffffff;
+    --text: #2d3748;
+    --text-bold: #1a202c;
+    --muted: #64748b;
+    --dim: #94a3b8;
+    --border: #e2e8f0;
+    --accent: #0891b2;
+    --shadow: rgba(0,0,0,0.1);
+    --silver: #64748b;
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'SF Mono', 'Menlo', monospace; background: #0a0e17; color: #c8d6e5; padding: 32px; }
-  h1 { font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #5f7d9a; margin-bottom: 4px; }
-  .subtitle { font-size: 11px; color: #3d566e; margin-bottom: 28px; }
+  body { font-family: 'SF Mono', 'Menlo', monospace; background: var(--bg); color: var(--text); padding: 32px; }
+  h1 { font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 4px; }
+  .subtitle { font-size: 11px; color: var(--dim); margin-bottom: 28px; }
   .storm { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; cursor: pointer; }
   .storm:hover .bar-fill { filter: brightness(1.2); }
-  .rank { font-size: 24px; font-weight: bold; color: #2d4055; width: 32px; text-align: right; }
+  .rank { font-size: 24px; font-weight: bold; color: var(--dim); width: 32px; text-align: right; }
   .rank.gold { color: #f0c040; }
-  .rank.silver { color: #a0b0c0; }
+  .rank.silver { color: var(--silver); }
   .rank.bronze { color: #c07040; }
   .info { width: 120px; }
-  .info .date { font-size: 12px; color: #c8d6e5; }
-  .info .day { font-size: 10px; color: #5f7d9a; }
-  .bar-container { flex: 1; height: 32px; background: #0f1923; border-radius: 4px; position: relative; overflow: hidden; }
+  .info .date { font-size: 12px; color: var(--text); }
+  .info .day { font-size: 10px; color: var(--muted); }
+  .bar-container { flex: 1; height: 32px; background: var(--bg-card); border-radius: 4px; position: relative; overflow: hidden; }
   .bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease-out; display: flex; align-items: center; padding-left: 8px; }
-  .bar-val { font-size: 12px; font-weight: bold; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
-  .pct { width: 50px; text-align: right; font-size: 11px; color: #5f7d9a; }
-  .storm-detail { margin-top: 32px; padding: 20px; background: #0f1923; border-radius: 8px; border: 1px solid #1a2332; display: none; }
-  .storm-detail h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #34c6c6; margin-bottom: 12px; }
-  .storm-detail .context { font-size: 11px; color: #5f7d9a; line-height: 1.6; }
+  .bar-val { font-size: 12px; font-weight: bold; color: var(--text-bold); text-shadow: 0 1px 3px var(--shadow); }
+  .pct { width: 50px; text-align: right; font-size: 11px; color: var(--muted); }
+  .storm-detail { margin-top: 32px; padding: 20px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); display: none; }
+  .storm-detail h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 12px; }
+  .storm-detail .context { font-size: 11px; color: var(--muted); line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -104,6 +128,17 @@ ranked.forEach((d, i) => {
     }, i * 80);
   });
 });
+</script>
+<button id="themeToggle" style="position:fixed;top:12px;right:12px;background:var(--bg-card);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;font:10px/1 monospace;cursor:pointer;z-index:100">Light</button>
+<script>
+(function(){
+  const btn = document.getElementById('themeToggle');
+  if(new URLSearchParams(location.search).has('light')){document.body.classList.add('light');btn.textContent='Dark'}
+  btn.addEventListener('click', () => {
+    document.body.classList.toggle('light');
+    btn.textContent = document.body.classList.contains('light') ? 'Dark' : 'Light';
+  });
+})();
 </script>
 </body>
 </html>
