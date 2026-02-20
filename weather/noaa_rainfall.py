@@ -18,7 +18,7 @@ First-time email setup (stores credentials in macOS Keychain):
 Data source:
     NOAA NCEI Access Data Service (public, no auth)
     https://www.ncei.noaa.gov/access/services/data/v1
-    Stations tried (in order): Palo Alto, Redwood City, San Jose Airport, SFO Airport
+    Stations tried (in order): San Jose Airport, Redwood City, SFO Airport
 """
 
 import argparse
@@ -46,12 +46,13 @@ DATA_TYPES = "PRCP"              # Precipitation (tenths of mm from GHCND)
 UNITS = "standard"               # API returns inches when units=standard
 
 # Stations to try, in order of preference.
-# Redwood City is closest to Palo Alto with reliable data;
-# the Palo Alto COOP station (USC00046646) has been inactive.
+# San Jose Airport is in the same rain shadow as Palo Alto, so its
+# rainfall totals are more representative than nearby Redwood City.
+# The Palo Alto COOP station (USC00046646) has been inactive.
 # Airport stations (USW*) are automated and always reporting.
 STATIONS = [
-    ("USC00047339", "Redwood City, CA"),
     ("USW00023293", "San Jose Airport, CA"),
+    ("USC00047339", "Redwood City, CA"),
     ("USW00023234", "SFO Airport, CA"),
 ]
 DEFAULT_STATION_ID = STATIONS[0][0]
