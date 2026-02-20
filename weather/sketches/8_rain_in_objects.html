@@ -73,90 +73,96 @@
 </head>
 <body>
 <h1>Your Rain in Objects</h1>
-<p class="subtitle">10.95 inches of rain on your 1,500 sq ft roof this season, translated into things you can picture</p>
+<p class="subtitle" id="subtitle">Loading data…</p>
 <div class="cards" id="cards"></div>
 <div class="total-bar">
   <div class="big">That's <span class="num" id="gallons">—</span> gallons</div>
   <div class="desc">of free water that fell on your roof since October 1</div>
 </div>
+<button id="themeToggle" style="position:fixed;top:12px;right:12px;background:var(--bg-card);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;font:10px/1 monospace;cursor:pointer;z-index:100">Dark</button>
 <script>
-// 10.95 inches on a 1500 sqft roof
-const INCHES = 10.95;
+(async () => {
+const DATA = await fetch('../data/rainfall.json').then(r => r.json());
+
+const INCHES = Object.values(DATA).reduce((a, b) => a + b, 0);
 const SQFT = 1500;
 const GALLONS = INCHES / 12 * SQFT * 7.48052; // cubic feet to gallons
-// ~10,224 gallons
+
+// Dynamic subtitle
+document.getElementById('subtitle').textContent =
+  `${INCHES.toFixed(2)} inches of rain on your 1,500 sq ft roof this season, translated into things you can picture`;
 
 const COMPARISONS = [
   {
-    icon: '🛁',
+    icon: '\u{1F6C1}',
     unit: 'bathtubs',
-    perUnit: 50, // gallons per bathtub
+    perUnit: 50,
     headline: (n) => `<span class="accent">${n}</span> bathtubs`,
     explain: 'Filled to the brim. That\'s roughly one bath every 16 hours since October.',
-    vizIcon: '🛁',
+    vizIcon: '\u{1F6C1}',
     vizMax: 40,
   },
   {
-    icon: '🏊',
+    icon: '\u{1F3CA}',
     unit: 'kiddie pools',
     perUnit: 170,
     headline: (n) => `<span class="accent">${n}</span> kiddie pools`,
     explain: 'The classic 5-foot round backyard pool. Enough for every kid on your block, twice over.',
-    vizIcon: '🏊',
+    vizIcon: '\u{1F3CA}',
     vizMax: 30,
   },
   {
-    icon: '☕',
+    icon: '\u{2615}',
     unit: 'cups of coffee',
-    perUnit: 0.042, // ~6.7 oz = 0.042 gallons
+    perUnit: 0.042,
     headline: (n) => `<span class="accent">${n.toLocaleString()}</span> coffees`,
     explain: 'Pour yourself a cup. Then do it a quarter-million more times.',
-    vizIcon: '☕',
+    vizIcon: '\u{2615}',
     vizMax: 50,
   },
   {
-    icon: '🚿',
+    icon: '\u{1F6BF}',
     unit: 'showers',
-    perUnit: 17, // gallons for an 8-minute shower
+    perUnit: 17,
     headline: (n) => `<span class="accent">${n}</span> showers`,
     explain: 'At 8 minutes each with a low-flow head. That\'s over a year of daily showers for the whole family.',
-    vizIcon: '🚿',
+    vizIcon: '\u{1F6BF}',
     vizMax: 40,
   },
   {
-    icon: '💧',
+    icon: '\u{1F4A7}',
     unit: 'water bottles',
-    perUnit: 0.132, // 16.9 oz = 0.132 gal
+    perUnit: 0.132,
     headline: (n) => `<span class="accent">${n.toLocaleString()}</span> water bottles`,
     explain: 'Standard 16.9 oz bottles, stacked end to end: about half a mile long.',
-    vizIcon: '💧',
+    vizIcon: '\u{1F4A7}',
     vizMax: 50,
   },
   {
-    icon: '🐘',
+    icon: '\u{1F418}',
     unit: 'elephant drinks',
-    perUnit: 50, // elephants drink ~50 gal/day
+    perUnit: 50,
     headline: (n) => `<span class="accent">${n}</span> elephant-days`,
     explain: 'An African elephant drinks about 50 gallons a day. Your roof could hydrate one for half a year.',
-    vizIcon: '🐘',
+    vizIcon: '\u{1F418}',
     vizMax: 30,
   },
   {
-    icon: '🧺',
+    icon: '\u{1F9FA}',
     unit: 'laundry loads',
     perUnit: 15,
     headline: (n) => `<span class="accent">${n}</span> loads of laundry`,
     explain: 'In a modern HE washer. About 4.5 loads every single day since the season started.',
-    vizIcon: '🧺',
+    vizIcon: '\u{1F9FA}',
     vizMax: 40,
   },
   {
-    icon: '🫗',
+    icon: '\u{1FAD7}',
     unit: 'gallon jugs',
     perUnit: 1,
     headline: (n) => `<span class="accent">${n.toLocaleString()}</span> gallon jugs`,
     explain: 'Lined up single-file, they\'d stretch about 2 miles down El Camino.',
-    vizIcon: '🫗',
+    vizIcon: '\u{1FAD7}',
     vizMax: 50,
   },
 ];
@@ -180,7 +186,7 @@ COMPARISONS.forEach((c, ci) => {
     <div class="headline">${c.headline(count)}</div>
     <div class="explain">${c.explain}</div>
     <div class="viz">${vizHTML}</div>
-    <div class="math">${GALLONS.toFixed(0)} gal ÷ ${c.perUnit} gal/${c.unit.replace(/s$/, '')} = ${count.toLocaleString()}</div>
+    <div class="math">${GALLONS.toFixed(0)} gal \u00f7 ${c.perUnit} gal/${c.unit.replace(/s$/, '')} = ${count.toLocaleString()}</div>
   `;
   cards.appendChild(card);
 });
@@ -196,16 +202,17 @@ function tick() {
   if (cur < target) requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
-</script>
-<button id="themeToggle" style="position:fixed;top:12px;right:12px;background:var(--bg-card);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;font:10px/1 monospace;cursor:pointer;z-index:100">Dark</button>
-<script>
-(function(){
-  const btn = document.getElementById('themeToggle');
-  if(new URLSearchParams(location.search).has('dark')){document.body.classList.add('dark');btn.textContent='Light'}
-  btn.addEventListener('click', () => {
-    document.body.classList.toggle('dark');
-    btn.textContent = document.body.classList.contains('dark') ? 'Light' : 'Dark';
-  });
+
+// Theme toggle
+const btn = document.getElementById('themeToggle');
+if (new URLSearchParams(location.search).has('dark')) {
+  document.body.classList.add('dark');
+  btn.textContent = 'Light';
+}
+btn.addEventListener('click', () => {
+  document.body.classList.toggle('dark');
+  btn.textContent = document.body.classList.contains('dark') ? 'Light' : 'Dark';
+});
 })();
 </script>
 </body>

@@ -94,8 +94,10 @@
 <div class="timeline" id="timeline"></div>
 <div class="stats" id="stats"></div>
 <div class="tooltip" id="tip"></div>
+<button id="themeToggle" style="position:fixed;top:12px;right:12px;background:var(--bg-card);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;font:10px/1 monospace;cursor:pointer;z-index:100">Dark</button>
 <script>
-const DATA = {"2025-10-01":0,"2025-10-02":0.24,"2025-10-03":0,"2025-10-04":0,"2025-10-05":0,"2025-10-06":0,"2025-10-07":0,"2025-10-08":0,"2025-10-09":0,"2025-10-10":0,"2025-10-11":0,"2025-10-12":0,"2025-10-13":0.53,"2025-10-14":0,"2025-10-15":0.01,"2025-10-16":0,"2025-10-17":0,"2025-10-18":0,"2025-10-19":0,"2025-10-20":0,"2025-10-21":0,"2025-10-22":0,"2025-10-23":0,"2025-10-24":0,"2025-10-25":0,"2025-10-26":0.02,"2025-10-27":0.03,"2025-10-28":0,"2025-10-29":0,"2025-10-30":0,"2025-10-31":0,"2025-11-01":0,"2025-11-02":0,"2025-11-03":0,"2025-11-04":0,"2025-11-05":0.11,"2025-11-06":0,"2025-11-07":0,"2025-11-08":0,"2025-11-09":0,"2025-11-10":0,"2025-11-11":0,"2025-11-12":0,"2025-11-13":1.47,"2025-11-14":0,"2025-11-15":0.22,"2025-11-16":0.29,"2025-11-17":0.68,"2025-11-18":0.01,"2025-11-19":0,"2025-11-20":0.24,"2025-11-21":0,"2025-11-22":0,"2025-11-23":0,"2025-11-24":0,"2025-11-25":0,"2025-11-26":0,"2025-11-27":0,"2025-11-28":0,"2025-11-29":0,"2025-11-30":0,"2025-12-01":0,"2025-12-02":0,"2025-12-03":0,"2025-12-04":0,"2025-12-05":0,"2025-12-06":0,"2025-12-07":0,"2025-12-08":0,"2025-12-09":0,"2025-12-10":0,"2025-12-11":0,"2025-12-12":0,"2025-12-13":0,"2025-12-14":0,"2025-12-15":0,"2025-12-16":0,"2025-12-17":0.01,"2025-12-18":0,"2025-12-19":0,"2025-12-20":0,"2025-12-21":0.08,"2025-12-22":0.34,"2025-12-23":0.07,"2025-12-24":1.27,"2025-12-25":0.99,"2025-12-26":0.09,"2025-12-27":0,"2025-12-28":0,"2025-12-29":0,"2025-12-30":0,"2025-12-31":0.79,"2026-01-01":0.63,"2026-01-02":0.11,"2026-01-03":0.10,"2026-01-04":1.22,"2026-01-05":0.85,"2026-01-06":0.02,"2026-01-07":0.03,"2026-01-08":0,"2026-01-09":0,"2026-01-10":0,"2026-01-11":0,"2026-01-12":0,"2026-01-13":0,"2026-01-14":0,"2026-01-15":0,"2026-01-16":0,"2026-01-17":0,"2026-01-18":0,"2026-01-19":0,"2026-01-20":0,"2026-01-21":0,"2026-01-22":0,"2026-01-23":0,"2026-01-24":0,"2026-01-25":0,"2026-01-26":0,"2026-01-27":0,"2026-01-28":0,"2026-01-29":0,"2026-01-30":0,"2026-01-31":0,"2026-02-01":0,"2026-02-02":0,"2026-02-03":0,"2026-02-06":0,"2026-02-07":0,"2026-02-08":0,"2026-02-09":0,"2026-02-10":0.39,"2026-02-11":0.11,"2026-02-12":0,"2026-02-13":0,"2026-02-14":0};
+(async () => {
+const DATA = await fetch('../data/rainfall.json').then(r => r.json());
 
 const dates = Object.keys(DATA).sort();
 const totalDays = dates.length;
@@ -173,8 +175,18 @@ statsEl.innerHTML = `
     <div class="detail">${current.wet ? 'wet' : 'dry'} since ${current.start}</div>
   </div>
 `;
+
+// Theme toggle
+const btn = document.getElementById('themeToggle');
+if (new URLSearchParams(location.search).has('dark')) {
+  document.body.classList.add('dark');
+  btn.textContent = 'Light';
+}
+btn.addEventListener('click', () => {
+  document.body.classList.toggle('dark');
+  btn.textContent = document.body.classList.contains('dark') ? 'Light' : 'Dark';
+});
+})();
 </script>
-<button id="themeToggle" onclick="document.body.classList.toggle('dark');this.textContent=document.body.classList.contains('dark')?'Light':'Dark'" style="position:fixed;top:12px;right:12px;background:var(--bg-card);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;font:10px/1 monospace;cursor:pointer;z-index:100">Dark</button>
-<script>if(new URLSearchParams(location.search).has('dark')){document.body.classList.add('dark');document.getElementById('themeToggle').textContent='Light'}</script>
 </body>
 </html>

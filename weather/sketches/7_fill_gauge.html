@@ -111,22 +111,28 @@
   <div class="side-stat"><div class="num" id="needed">—</div><div class="label">Needed to hit avg</div></div>
   <div class="side-stat"><div class="num" id="pace">—</div><div class="label">Needed per day</div></div>
 </div>
+<button id="themeToggle" style="position:fixed;top:12px;right:12px;background:var(--bg-card);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;font:10px/1 monospace;cursor:pointer;z-index:100">Dark</button>
 <script>
-const TOTAL = 10.95;
+(async () => {
+const DATA = await fetch('../data/rainfall.json').then(r => r.json());
+
+// Compute totals from daily data
+const allDates = Object.keys(DATA).sort();
+const TOTAL = Object.values(DATA).reduce((a, b) => a + b, 0);
 const AVG = 15.5;
 const PCT = TOTAL / AVG;
 const SEASON_DAYS = 365; // Oct-Sep
-const ELAPSED = 137; // Oct 1 to Feb 14
+const ELAPSED = allDates.length;
 const REMAINING = SEASON_DAYS - ELAPSED;
 
 // Monthly breakdown for the colored layers
-const MONTHS = [
-  { name: 'Oct', total: 0.83, color: '#1a5a2e' },
-  { name: 'Nov', total: 3.02, color: '#2d6a4f' },
-  { name: 'Dec', total: 3.64, color: '#0e5a6f' },
-  { name: 'Jan', total: 2.96, color: '#1a8a8a' },
-  { name: 'Feb', total: 0.50, color: '#34c6c6' },
-];
+const MONTH_COLORS = ['#1a5a2e', '#2d6a4f', '#0e5a6f', '#1a8a8a', '#34c6c6', '#6ee7e7', '#a0f0f0'];
+const monthKeys = [...new Set(allDates.map(d => d.slice(0, 7)))];
+const MONTHS = monthKeys.map((key, i) => {
+  const total = allDates.filter(d => d.startsWith(key)).reduce((sum, d) => sum + DATA[d], 0);
+  const name = new Date(key + '-15').toLocaleDateString('en-US', {month: 'short'});
+  return { name, total, color: MONTH_COLORS[i % MONTH_COLORS.length] };
+});
 
 // Fill gauge
 const fill = document.getElementById('fill');
@@ -182,16 +188,17 @@ const needed = Math.max(0, AVG - TOTAL);
 document.getElementById('daysLeft').textContent = REMAINING;
 document.getElementById('needed').textContent = needed.toFixed(1) + '"';
 document.getElementById('pace').textContent = (needed / REMAINING).toFixed(3) + '"/d';
-</script>
-<button id="themeToggle" style="position:fixed;top:12px;right:12px;background:var(--bg-card);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;font:10px/1 monospace;cursor:pointer;z-index:100">Dark</button>
-<script>
-(function(){
-  const btn = document.getElementById('themeToggle');
-  if(new URLSearchParams(location.search).has('dark')){document.body.classList.add('dark');btn.textContent='Light'}
-  btn.addEventListener('click', () => {
-    document.body.classList.toggle('dark');
-    btn.textContent = document.body.classList.contains('dark') ? 'Light' : 'Dark';
-  });
+
+// Theme toggle
+const btn = document.getElementById('themeToggle');
+if (new URLSearchParams(location.search).has('dark')) {
+  document.body.classList.add('dark');
+  btn.textContent = 'Light';
+}
+btn.addEventListener('click', () => {
+  document.body.classList.toggle('dark');
+  btn.textContent = document.body.classList.contains('dark') ? 'Light' : 'Dark';
+});
 })();
 </script>
 </body>

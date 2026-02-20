@@ -70,15 +70,28 @@
 </head>
 <body>
 <h1>Rain Calendar</h1>
-<p class="subtitle">Oct 2025 – Feb 2026 · San Jose Airport, CA · each cell = one day</p>
+<p class="subtitle" id="subtitle">Loading data…</p>
 <div style="display:flex">
   <div class="day-labels"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
   <div class="calendar" id="cal"></div>
 </div>
 <div class="legend" id="legend"></div>
 <div class="tooltip" id="tip"></div>
+<button id="themeToggle" style="position:fixed;top:12px;right:12px;background:var(--bg-card);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;font:10px/1 monospace;cursor:pointer;z-index:100">Dark</button>
 <script>
-const DATA = {"2025-10-01":0,"2025-10-02":0.24,"2025-10-03":0,"2025-10-04":0,"2025-10-05":0,"2025-10-06":0,"2025-10-07":0,"2025-10-08":0,"2025-10-09":0,"2025-10-10":0,"2025-10-11":0,"2025-10-12":0,"2025-10-13":0.53,"2025-10-14":0,"2025-10-15":0.01,"2025-10-16":0,"2025-10-17":0,"2025-10-18":0,"2025-10-19":0,"2025-10-20":0,"2025-10-21":0,"2025-10-22":0,"2025-10-23":0,"2025-10-24":0,"2025-10-25":0,"2025-10-26":0.02,"2025-10-27":0.03,"2025-10-28":0,"2025-10-29":0,"2025-10-30":0,"2025-10-31":0,"2025-11-01":0,"2025-11-02":0,"2025-11-03":0,"2025-11-04":0,"2025-11-05":0.11,"2025-11-06":0,"2025-11-07":0,"2025-11-08":0,"2025-11-09":0,"2025-11-10":0,"2025-11-11":0,"2025-11-12":0,"2025-11-13":1.47,"2025-11-14":0,"2025-11-15":0.22,"2025-11-16":0.29,"2025-11-17":0.68,"2025-11-18":0.01,"2025-11-19":0,"2025-11-20":0.24,"2025-11-21":0,"2025-11-22":0,"2025-11-23":0,"2025-11-24":0,"2025-11-25":0,"2025-11-26":0,"2025-11-27":0,"2025-11-28":0,"2025-11-29":0,"2025-11-30":0,"2025-12-01":0,"2025-12-02":0,"2025-12-03":0,"2025-12-04":0,"2025-12-05":0,"2025-12-06":0,"2025-12-07":0,"2025-12-08":0,"2025-12-09":0,"2025-12-10":0,"2025-12-11":0,"2025-12-12":0,"2025-12-13":0,"2025-12-14":0,"2025-12-15":0,"2025-12-16":0,"2025-12-17":0.01,"2025-12-18":0,"2025-12-19":0,"2025-12-20":0,"2025-12-21":0.08,"2025-12-22":0.34,"2025-12-23":0.07,"2025-12-24":1.27,"2025-12-25":0.99,"2025-12-26":0.09,"2025-12-27":0,"2025-12-28":0,"2025-12-29":0,"2025-12-30":0,"2025-12-31":0.79,"2026-01-01":0.63,"2026-01-02":0.11,"2026-01-03":0.10,"2026-01-04":1.22,"2026-01-05":0.85,"2026-01-06":0.02,"2026-01-07":0.03,"2026-01-08":0,"2026-01-09":0,"2026-01-10":0,"2026-01-11":0,"2026-01-12":0,"2026-01-13":0,"2026-01-14":0,"2026-01-15":0,"2026-01-16":0,"2026-01-17":0,"2026-01-18":0,"2026-01-19":0,"2026-01-20":0,"2026-01-21":0,"2026-01-22":0,"2026-01-23":0,"2026-01-24":0,"2026-01-25":0,"2026-01-26":0,"2026-01-27":0,"2026-01-28":0,"2026-01-29":0,"2026-01-30":0,"2026-01-31":0,"2026-02-01":0,"2026-02-02":0,"2026-02-03":0,"2026-02-06":0,"2026-02-07":0,"2026-02-08":0,"2026-02-09":0,"2026-02-10":0.39,"2026-02-11":0.11,"2026-02-12":0,"2026-02-13":0,"2026-02-14":0};
+(async () => {
+const DATA = await fetch('../data/rainfall.json').then(r => r.json());
+
+// Derive months from data
+const allDates = Object.keys(DATA).sort();
+const monthKeys = [...new Set(allDates.map(d => d.slice(0, 7)))];
+const mNames = monthKeys.map(m => new Date(m + '-15').toLocaleDateString('en-US', {month: 'long'}));
+
+// Dynamic subtitle
+const firstDate = new Date(allDates[0] + 'T12:00');
+const lastDate = new Date(allDates[allDates.length - 1] + 'T12:00');
+const fmt = (d) => d.toLocaleDateString('en-US', {month: 'short', year: 'numeric'});
+document.getElementById('subtitle').textContent = `${fmt(firstDate)} – ${fmt(lastDate)} · San Jose Airport, CA · each cell = one day`;
 
 const COLORS_DARK = ['#0f1923','#0c3547','#0e5a6f','#1a8a8a','#34c6c6','#6ee7e7'];
 const COLORS_LIGHT = ['#e2e8f0','#b2d8e8','#7cc5d9','#4db8c4','#0891b2','#0e7490'];
@@ -101,12 +114,10 @@ function color(v) {
 
 const cal = document.getElementById('cal');
 const tip = document.getElementById('tip');
-const months = ['2025-10','2025-11','2025-12','2026-01','2026-02'];
-const mNames = ['October','November','December','January','February'];
 
 function renderCalendar() {
   cal.innerHTML = '';
-  months.forEach((m,mi) => {
+  monthKeys.forEach((m,mi) => {
     const div = document.createElement('div');
     div.className = 'month';
     const lbl = document.createElement('div');
@@ -171,8 +182,20 @@ cal.addEventListener('mousemove', e => {
   tip.style.top = e.clientY - 10 + 'px';
 });
 cal.addEventListener('mouseleave', () => tip.style.display = 'none');
+
+// Theme toggle
+const btn = document.getElementById('themeToggle');
+if (new URLSearchParams(location.search).has('dark')) {
+  document.body.classList.add('dark');
+  btn.textContent = 'Light';
+  renderAll();
+}
+btn.addEventListener('click', () => {
+  document.body.classList.toggle('dark');
+  btn.textContent = document.body.classList.contains('dark') ? 'Light' : 'Dark';
+  renderAll();
+});
+})();
 </script>
-<button id="themeToggle" onclick="document.body.classList.toggle('dark');this.textContent=document.body.classList.contains('dark')?'Light':'Dark';renderAll();" style="position:fixed;top:12px;right:12px;background:var(--bg-card);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:4px;font:10px/1 monospace;cursor:pointer;z-index:100">Dark</button>
-<script>if(new URLSearchParams(location.search).has('dark')){document.body.classList.add('dark');document.getElementById('themeToggle').textContent='Light';renderAll();}</script>
 </body>
 </html>

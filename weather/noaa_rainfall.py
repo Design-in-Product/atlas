@@ -384,6 +384,13 @@ def main() -> None:
     )
     parser.add_argument("--json", action="store_true", help="Output raw JSON.")
     parser.add_argument("--csv", action="store_true", help="Output CSV.")
+    parser.add_argument(
+        "--site-json",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Write site-friendly JSON ({date: inches} map) to PATH for sketch visualizations.",
+    )
     parser.add_argument("--debug", action="store_true", help="Show raw API response.")
     parser.add_argument(
         "--station",
@@ -429,11 +436,22 @@ def main() -> None:
         if len(stations_to_try) > 1:
             print(f"  No data from {sname}, trying next station...", file=sys.stderr)
 
+    if args.site_json:
+        site_data = {r["date"]: r["precipitation_in"] for r in records}
+        import pathlib
+
+        pathlib.Path(args.site_json).parent.mkdir(parents=True, exist_ok=True)
+        with open(args.site_json, "w") as f:
+            json.dump(site_data, f, indent=2)
+        print(
+            f"Wrote {len(site_data)} days to {args.site_json}", file=sys.stderr
+        )
+
     if args.json:
         print(json.dumps(records, indent=2))
     elif args.csv:
         print(output_csv(records), end="")
-    else:
+    elif not args.site_json:
         report = format_report(records, start, end,
                                station_id=used_id, station_name=used_name)
         print(report)
