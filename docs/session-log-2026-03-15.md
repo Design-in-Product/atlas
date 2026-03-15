@@ -66,8 +66,22 @@ A single page you can visit any day to see the most current, most interesting su
 
 ---
 
+## Session wrap-up
+
+### Documents created for migration
+- `docs/ROADMAP.md` — standalone roadmap to carry into the weather repo
+- `docs/README-for-weather-repo.md` — updated README with corrected paths (no `weather/` prefix)
+- `docs/new-session-prompt.md` — step-by-step migration instructions + prompt template for the first session on the weather repo
+
+### Migration status
+- All code, data, sketches, and workflow built and tested in atlas
+- Corrected workflow file (paths fixed) documented for manual copy
+- Migration commands ready to run on local Mac
+- Next step: user runs migration commands, commits to weather repo, starts new Claude Code session there
+
+---
+
 ## Open questions
 - GitHub Pages setup for hosting the sketches publicly
-- Whether to keep the README paths updated for standalone weather repo
 - Notification design: what triggers are worth alerting on?
 - Temperature data source: same NOAA NCEI API supports TMAX/TMIN from the same stations
