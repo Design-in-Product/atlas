@@ -46,11 +46,28 @@ A single page you can visit any day to see the most current, most interesting su
 - Could start with a simple fixed interpolation, then expose sliders or presets
 - Someday: a more principled spatial interpolation (inverse-distance weighting, kriging, etc.)
 
-### v2 — (to be discussed next)
+#### 4. Email / SMS summary notifications
+- The email infrastructure already exists (macOS Keychain SMTP, `--email` flag)
+- Not yet wired into the GitHub Action — could send a daily or weekly digest
+- SMS is a natural extension (e.g., Twilio, or email-to-SMS gateways)
+- To be designed when we get here: what's worth notifying about? (rain today, drought broken, season milestone, weekly recap, etc.)
+
+#### 5. Retrospective analysis (before v2)
+- Historical patterns, trends, year-over-year comparisons
+- This is extensive site functionality that should be explored with rainfall first before adding new data types
+- Builds naturally on the landing page + station picker foundation
+
+### v2 — daily high/low temperature
+
+- Extend the same architecture to temperature readings (daily high/low + time of occurrence)
+- Probably *not* on the rain-year (Oct–Sep) calendar — temperature has its own natural cycles
+- Focus on retrospective patterns, trends, YoY comparisons
+- **Key insight**: the retrospective/comparison features should be built and proven with rainfall first, then generalized to temperature — not the other way around. Don't complicate things by introducing a new core data type before the analytical tools are solid.
 
 ---
 
 ## Open questions
 - GitHub Pages setup for hosting the sketches publicly
 - Whether to keep the README paths updated for standalone weather repo
-- v2 ideas (user to share next)
+- Notification design: what triggers are worth alerting on?
+- Temperature data source: same NOAA NCEI API supports TMAX/TMIN from the same stations
